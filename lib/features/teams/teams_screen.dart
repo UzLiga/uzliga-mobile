@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -6,6 +7,7 @@ import '../../core/api/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/models/models.dart';
 import '../../shared/widgets/widgets.dart';
+import '../auth/auth_provider.dart';
 
 final teamsProvider = FutureProvider.autoDispose((ref) {
   return ref.watch(apiClientProvider).listTeams(limit: 40);
@@ -24,7 +26,16 @@ class TeamsScreen extends ConsumerWidget {
     final async = ref.watch(teamsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Jamoalar')),
+      appBar: AppBar(
+        title: const Text('Jamoalar'),
+        actions: [
+          IconButton(
+            tooltip: 'Invite kod',
+            onPressed: () => context.push('/app/teams/join'),
+            icon: const Icon(Icons.vpn_key_outlined),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.push('/app/teams/create'),
         backgroundColor: AppColors.primary,
@@ -87,6 +98,7 @@ class TeamDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(teamDetailProvider(teamId));
+    final me = ref.watch(authProvider).user;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Jamoa')),
@@ -97,6 +109,8 @@ class TeamDetailScreen extends ConsumerWidget {
           onRetry: () => ref.invalidate(teamDetailProvider(teamId)),
         ),
         data: (team) {
+          final isCaptain = me != null && me.id == team.captainId;
+          final isMember = team.members.any((m) => m.user.id == me?.id);
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
@@ -111,6 +125,71 @@ class TeamDetailScreen extends ConsumerWidget {
                 '${team.membersCount} a’zo · ${team.wins}W ${team.draws}D ${team.losses}L',
                 style: const TextStyle(color: AppColors.muted),
               ),
+              if (isCaptain && team.inviteCode != null) ...[
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface2,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppColors.edge),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Invite kod', style: TextStyle(fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              team.inviteCode!,
+                              style: const TextStyle(
+                                fontFamily: 'monospace',
+                                letterSpacing: 2,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: 'Nusxa',
+                            onPressed: () async {
+                              await Clipboard.setData(
+                                ClipboardData(text: team.inviteCode!),
+                              );
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Kod nusxalandi')),
+                                );
+                              }
+                            },
+                            icon: const Icon(Icons.copy, size: 18),
+                          ),
+                          IconButton(
+                            tooltip: 'Yangilash',
+                            onPressed: () async {
+                              try {
+                                await ref
+                                    .read(apiClientProvider)
+                                    .regenerateTeamInvite(team.id);
+                                ref.invalidate(teamDetailProvider(teamId));
+                              } catch (e) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('$e')),
+                                  );
+                                }
+                              }
+                            },
+                            icon: const Icon(Icons.refresh, size: 18),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 20),
               const Text('A’zolar', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
               const SizedBox(height: 8),
@@ -127,30 +206,190 @@ class TeamDetailScreen extends ConsumerWidget {
                   subtitle: Text(m.role == 'captain' ? 'Kapitan' : 'O‘yinchi'),
                 ),
               ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () async {
-                  try {
-                    await ref.read(apiClientProvider).joinTeam(team.id);
-                    ref.invalidate(teamDetailProvider(teamId));
-                    ref.invalidate(teamsProvider);
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Jamoaga qo‘shildingiz')),
-                      );
+              if (!isMember) ...[
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () async {
+                    try {
+                      await ref.read(apiClientProvider).joinTeam(team.id);
+                      ref.invalidate(teamDetailProvider(teamId));
+                      ref.invalidate(teamsProvider);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Jamoaga qo‘shildingiz')),
+                        );
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context)
+                            .showSnackBar(SnackBar(content: Text('$e')));
+                      }
                     }
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context)
-                          .showSnackBar(SnackBar(content: Text('$e')));
-                    }
-                  }
-                },
-                child: const Text('Qo‘shilish'),
-              ),
+                  },
+                  child: const Text('Qo‘shilish'),
+                ),
+              ],
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+class TeamJoinScreen extends ConsumerStatefulWidget {
+  const TeamJoinScreen({super.key, this.code});
+
+  final String? code;
+
+  @override
+  ConsumerState<TeamJoinScreen> createState() => _TeamJoinScreenState();
+}
+
+class _TeamJoinScreenState extends ConsumerState<TeamJoinScreen> {
+  late final TextEditingController _codeCtrl;
+  TeamInvitePreview? _preview;
+  String? _error;
+  bool _loading = false;
+  bool _accepting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _codeCtrl = TextEditingController(text: widget.code?.toUpperCase() ?? '');
+    if ((widget.code ?? '').trim().length >= 4) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _lookup());
+    }
+  }
+
+  @override
+  void dispose() {
+    _codeCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _lookup() async {
+    final code = _codeCtrl.text.trim().toUpperCase();
+    if (code.length < 4) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+      _preview = null;
+    });
+    try {
+      final preview = await ref.read(apiClientProvider).getTeamInvitePreview(code);
+      if (mounted) setState(() => _preview = preview);
+    } catch (e) {
+      if (mounted) setState(() => _error = 'Invite topilmadi');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _accept() async {
+    final code = (_preview?.inviteCode ?? _codeCtrl.text).trim().toUpperCase();
+    if (code.isEmpty) return;
+    setState(() => _accepting = true);
+    try {
+      final team = await ref.read(apiClientProvider).acceptTeamInvite(code);
+      ref.invalidate(teamsProvider);
+      if (!mounted) return;
+      context.go('/app/teams/${team.id}');
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      }
+    } finally {
+      if (mounted) setState(() => _accepting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Jamoa invite')),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          TextField(
+            controller: _codeCtrl,
+            textCapitalization: TextCapitalization.characters,
+            decoration: const InputDecoration(
+              labelText: 'Invite kod',
+              border: OutlineInputBorder(),
+            ),
+            onSubmitted: (_) => _lookup(),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton(
+            onPressed: _loading ? null : _lookup,
+            child: _loading
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Tekshirish'),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 16),
+            Text(_error!, style: const TextStyle(color: Colors.redAccent)),
+          ],
+          if (_preview != null) ...[
+            const SizedBox(height: 24),
+            Center(
+              child: Column(
+                children: [
+                  CircleAvatar(
+                    radius: 36,
+                    backgroundColor: AppColors.surface2,
+                    backgroundImage: _preview!.logoUrl != null
+                        ? NetworkImage(_preview!.logoUrl!)
+                        : null,
+                    child: _preview!.logoUrl == null
+                        ? Text(
+                            _preview!.name.isNotEmpty ? _preview!.name[0] : 'J',
+                            style: const TextStyle(fontSize: 28),
+                          )
+                        : null,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    _preview!.name,
+                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '${_preview!.membersCount} a’zo'
+                    '${_preview!.captainName != null ? ' · Sardor: ${_preview!.captainName}' : ''}',
+                    style: const TextStyle(color: AppColors.muted),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _preview!.inviteCode,
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      letterSpacing: 2,
+                      color: AppColors.faint,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  ElevatedButton.icon(
+                    onPressed: _accepting ? null : _accept,
+                    icon: const Icon(Icons.person_add_alt_1),
+                    label: _accepting
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Jamoaga qo‘shilish'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

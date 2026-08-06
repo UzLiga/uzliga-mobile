@@ -507,4 +507,133 @@ class ApiClient {
         parse: (d) => TournamentDetail.fromJson(Map<String, dynamic>.from(d as Map)),
       );
 
+  Future<TournamentDetail> joinTournament({
+    required int tournamentId,
+    required int teamId,
+  }) =>
+      _post(
+        '/tournaments/$tournamentId/join',
+        data: {'team_id': teamId},
+        parse: (d) => TournamentDetail.fromJson(Map<String, dynamic>.from(d as Map)),
+      );
+
+  // —— Free agents ——
+  Future<PageResult<FreeAgentPost>> listFreeAgents({
+    String? type,
+    int limit = 30,
+    int offset = 0,
+  }) =>
+      _get(
+        '/free-agents',
+        query: {
+          if (type != null) 'type': type,
+          'limit': limit,
+          'offset': offset,
+        },
+        parse: (d) => PageResult.fromJson(
+          Map<String, dynamic>.from(d as Map),
+          FreeAgentPost.fromJson,
+        ),
+      );
+
+  Future<FreeAgentPost> createFreeAgent({
+    required String type,
+    required String comment,
+    String? position,
+    String? locationText,
+  }) =>
+      _post(
+        '/free-agents',
+        data: {
+          'type': type,
+          'comment': comment,
+          if (position != null && position.isNotEmpty) 'position': position,
+          if (locationText != null && locationText.isNotEmpty)
+            'location_text': locationText,
+        },
+        parse: (d) => FreeAgentPost.fromJson(Map<String, dynamic>.from(d as Map)),
+      );
+
+  Future<void> closeFreeAgent(int id) async {
+    try {
+      await _dio.post('/free-agents/$id/close');
+    } on DioException catch (e) {
+      _throwDio(e);
+    }
+  }
+
+  // —— Notifications ——
+  Future<PageResult<AppNotification>> listNotifications({int limit = 30, int offset = 0}) =>
+      _get(
+        '/notifications',
+        query: {'limit': limit, 'offset': offset},
+        parse: (d) => PageResult.fromJson(
+          Map<String, dynamic>.from(d as Map),
+          AppNotification.fromJson,
+        ),
+      );
+
+  Future<int> unreadNotifications() async {
+    final data = await _get(
+      '/notifications/unread-count',
+      parse: (d) => Map<String, dynamic>.from(d as Map),
+    );
+    return (data['count'] as num?)?.toInt() ?? 0;
+  }
+
+  Future<void> markNotificationRead(int id) async {
+    try {
+      await _dio.post('/notifications/$id/read');
+    } on DioException catch (e) {
+      _throwDio(e);
+    }
+  }
+
+  Future<void> markAllNotificationsRead() async {
+    try {
+      await _dio.post('/notifications/read-all');
+    } on DioException catch (e) {
+      _throwDio(e);
+    }
+  }
+
+  // —— Wallet ——
+  Future<WalletInfo> getWallet({int limit = 20, int offset = 0}) => _get(
+        '/wallet',
+        query: {'limit': limit, 'offset': offset},
+        parse: (d) => WalletInfo.fromJson(Map<String, dynamic>.from(d as Map)),
+      );
+
+  Future<Map<String, dynamic>> topUp({required int amount, String provider = 'fake'}) =>
+      _post(
+        '/payments/top-up',
+        data: {'amount': amount, 'provider': provider},
+        parse: (d) => Map<String, dynamic>.from(d as Map),
+      );
+
+  Future<void> completePayment(int paymentId) async {
+    try {
+      await _dio.post('/payments/complete/$paymentId');
+    } on DioException catch (e) {
+      _throwDio(e);
+    }
+  }
+
+  // —— Team invite ——
+  Future<TeamInvitePreview> getTeamInvitePreview(String code) => _get(
+        '/teams/invite/$code',
+        parse: (d) =>
+            TeamInvitePreview.fromJson(Map<String, dynamic>.from(d as Map)),
+      );
+
+  Future<TeamDetail> acceptTeamInvite(String code) => _post(
+        '/teams/invite/$code/accept',
+        parse: (d) => TeamDetail.fromJson(Map<String, dynamic>.from(d as Map)),
+      );
+
+  Future<TeamDetail> regenerateTeamInvite(int teamId) => _post(
+        '/teams/$teamId/invite/regenerate',
+        parse: (d) => TeamDetail.fromJson(Map<String, dynamic>.from(d as Map)),
+      );
+
 }

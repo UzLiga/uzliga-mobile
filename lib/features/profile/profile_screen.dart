@@ -132,6 +132,21 @@ class ProfileScreen extends ConsumerWidget {
                   child: Column(
                     children: [
                       ListTile(
+                        leading: const Icon(Icons.account_balance_wallet_outlined),
+                        title: const Text('Hamyon'),
+                        subtitle: Text('${user.topBalance} to‘p'),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => context.push('/app/wallet'),
+                      ),
+                      const Divider(height: 1),
+                      ListTile(
+                        leading: const Icon(Icons.notifications_outlined),
+                        title: const Text('Bildirishnomalar'),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => context.push('/app/notifications'),
+                      ),
+                      const Divider(height: 1),
+                      ListTile(
                         leading: const Icon(Icons.calendar_month_outlined),
                         title: const Text('Mening bronlarim'),
                         trailing: const Icon(Icons.chevron_right),
@@ -150,6 +165,13 @@ class ProfileScreen extends ConsumerWidget {
                         title: const Text('Jamoalar'),
                         trailing: const Icon(Icons.chevron_right),
                         onTap: () => context.go('/app/teams'),
+                      ),
+                      const Divider(height: 1),
+                      ListTile(
+                        leading: const Icon(Icons.person_add_alt_1_outlined),
+                        title: const Text('Invite kod bilan qo‘shilish'),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => context.push('/app/teams/join'),
                       ),
                       const Divider(height: 1),
                       ListTile(

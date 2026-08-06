@@ -13,6 +13,9 @@ import '../../features/profile/user_profile_screen.dart';
 import '../../features/reels/reels_screen.dart';
 import '../../features/shell/shell_screen.dart';
 import '../../features/tournaments/tournaments_screen.dart';
+import '../../features/notifications/notifications_screen.dart';
+import '../../features/wallet/wallet_screen.dart';
+import '../../features/free_agents/free_agents_screen.dart';
 import '../api/token_storage.dart';
 
 final _rootKey = GlobalKey<NavigatorState>();
@@ -133,12 +136,33 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (_, __) => const CreateTeamScreen(),
           ),
           GoRoute(
+            path: 'join',
+            builder: (_, state) => TeamJoinScreen(
+              code: state.uri.queryParameters['code'],
+            ),
+          ),
+          GoRoute(
             path: ':id',
             builder: (_, state) => TeamDetailScreen(
               teamId: int.parse(state.pathParameters['id']!),
             ),
           ),
         ],
+      ),
+      GoRoute(
+        path: '/app/notifications',
+        parentNavigatorKey: _rootKey,
+        builder: (_, __) => const NotificationsScreen(),
+      ),
+      GoRoute(
+        path: '/app/wallet',
+        parentNavigatorKey: _rootKey,
+        builder: (_, __) => const WalletScreen(),
+      ),
+      GoRoute(
+        path: '/app/free-agents',
+        parentNavigatorKey: _rootKey,
+        builder: (_, __) => const FreeAgentsScreen(),
       ),
       GoRoute(
         path: '/app/tournaments',

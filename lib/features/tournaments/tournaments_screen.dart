@@ -80,7 +80,7 @@ class TournamentsScreen extends ConsumerWidget {
                                 style: const TextStyle(color: AppColors.muted, fontSize: 12),
                               ),
                               if (t.stadiumName != null)
-                                Text('📍 ${t.stadiumName}', style: const TextStyle(fontSize: 11, color: AppColors.primary)),
+                                Text(t.stadiumName!, style: const TextStyle(fontSize: 11, color: AppColors.primary)),
                             ],
                           ),
                         ),
@@ -98,23 +98,89 @@ class TournamentsScreen extends ConsumerWidget {
   }
 }
 
-class TournamentDetailScreen extends ConsumerWidget {
+class TournamentDetailScreen extends ConsumerStatefulWidget {
   const TournamentDetailScreen({super.key, required this.id});
 
   final int id;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(tournamentDetailProvider(id));
+  ConsumerState<TournamentDetailScreen> createState() =>
+      _TournamentDetailScreenState();
+}
+
+class _TournamentDetailScreenState extends ConsumerState<TournamentDetailScreen> {
+  bool _joining = false;
+
+  Future<void> _join() async {
+    final teams = await ref.read(apiClientProvider).myTeams(limit: 30);
+    if (!mounted) return;
+    if (teams.items.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Avval jamoa yarating yoki qo‘shiling')),
+      );
+      return;
+    }
+    final teamId = await showModalBottomSheet<int>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      builder: (ctx) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text(
+                'Jamoani tanlang',
+                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+              ),
+            ),
+            ...teams.items.map(
+              (t) => ListTile(
+                title: Text(t.name),
+                subtitle: Text('${t.membersCount} a’zo'),
+                onTap: () => Navigator.pop(ctx, t.id),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (teamId == null || !mounted) return;
+    setState(() => _joining = true);
+    try {
+      await ref.read(apiClientProvider).joinTournament(
+            tournamentId: widget.id,
+            teamId: teamId,
+          );
+      ref.invalidate(tournamentDetailProvider(widget.id));
+      ref.invalidate(tournamentsProvider);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Turnirga yozildingiz')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      }
+    } finally {
+      if (mounted) setState(() => _joining = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final async = ref.watch(tournamentDetailProvider(widget.id));
     return Scaffold(
       appBar: AppBar(title: const Text('Turnir')),
       body: async.when(
         loading: () => const LoadingView(),
         error: (e, _) => ErrorView(
           message: e.toString(),
-          onRetry: () => ref.invalidate(tournamentDetailProvider(id)),
+          onRetry: () => ref.invalidate(tournamentDetailProvider(widget.id)),
         ),
         data: (t) {
+          final canJoin = t.status == 'open' || t.status == 'registration';
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
@@ -124,7 +190,7 @@ class TournamentDetailScreen extends ConsumerWidget {
                   style: const TextStyle(color: AppColors.muted)),
               if (t.stadiumName != null) ...[
                 const SizedBox(height: 6),
-                Text('📍 ${t.stadiumName}', style: const TextStyle(color: AppColors.primary)),
+                Text(t.stadiumName!, style: const TextStyle(color: AppColors.primary)),
               ],
               if (t.winnerTeamName != null) ...[
                 const SizedBox(height: 12),
@@ -135,8 +201,21 @@ class TournamentDetailScreen extends ConsumerWidget {
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: AppColors.primary.withValues(alpha: 0.35)),
                   ),
-                  child: Text('🏆 Chempion: ${t.winnerTeamName}',
+                  child: Text('Chempion: ${t.winnerTeamName}',
                       style: const TextStyle(fontWeight: FontWeight.w800)),
+                ),
+              ],
+              if (canJoin) ...[
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: _joining ? null : _join,
+                  child: _joining
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Jamoa bilan qo‘shilish'),
                 ),
               ],
               const SizedBox(height: 20),
@@ -176,7 +255,7 @@ class TournamentDetailScreen extends ConsumerWidget {
                         ),
                         if (m.stadiumName != null) ...[
                           const SizedBox(height: 4),
-                          Text('📍 ${m.stadiumName}', style: const TextStyle(fontSize: 11, color: AppColors.primary)),
+                          Text(m.stadiumName!, style: const TextStyle(fontSize: 11, color: AppColors.primary)),
                         ],
                       ],
                     ),

@@ -46,8 +46,19 @@ class HomeScreen extends ConsumerWidget {
               ),
               actions: [
                 IconButton(
+                  onPressed: () => context.push('/app/wallet'),
+                  icon: const Icon(Icons.account_balance_wallet_outlined),
+                  tooltip: 'Hamyon',
+                ),
+                IconButton(
+                  onPressed: () => context.push('/app/notifications'),
+                  icon: const Icon(Icons.notifications_outlined),
+                  tooltip: 'Bildirishnomalar',
+                ),
+                IconButton(
                   onPressed: () => context.push('/app/bookings'),
                   icon: const Icon(Icons.calendar_month_outlined),
+                  tooltip: 'Bronlar',
                 ),
               ],
             ),
@@ -124,12 +135,28 @@ class HomeScreen extends ConsumerWidget {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    _MiniPillar(
-                      title: 'Turnirlar',
-                      subtitle: 'Setka · chempionat',
-                      icon: Icons.emoji_events,
-                      color: AppColors.primary,
-                      onTap: () => context.push('/app/tournaments'),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _MiniPillar(
+                            title: 'Turnirlar',
+                            subtitle: 'Setka · chempionat',
+                            icon: Icons.emoji_events,
+                            color: AppColors.primary,
+                            onTap: () => context.push('/app/tournaments'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _MiniPillar(
+                            title: 'Sherik',
+                            subtitle: 'Free agent',
+                            icon: Icons.handshake_outlined,
+                            color: const Color(0xFFA78BFA),
+                            onTap: () => context.push('/app/free-agents'),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 24),
                     SectionHeader(

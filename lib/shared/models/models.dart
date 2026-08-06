@@ -268,6 +268,7 @@ class Team {
     required this.createdAt,
     this.logoUrl,
     this.description,
+    this.inviteCode,
   });
 
   final int id;
@@ -280,6 +281,7 @@ class Team {
   final int losses;
   final int draws;
   final String createdAt;
+  final String? inviteCode;
 
   factory Team.fromJson(Map<String, dynamic> json) => Team(
         id: json['id'] as int,
@@ -292,6 +294,7 @@ class Team {
         losses: (json['losses'] as num?)?.toInt() ?? 0,
         draws: (json['draws'] as num?)?.toInt() ?? 0,
         createdAt: json['created_at']?.toString() ?? '',
+        inviteCode: json['invite_code'] as String?,
       );
 }
 
@@ -326,6 +329,7 @@ class TeamDetail extends Team {
     required this.members,
     super.logoUrl,
     super.description,
+    super.inviteCode,
   });
 
   final List<TeamMember> members;
@@ -343,12 +347,41 @@ class TeamDetail extends Team {
       losses: base.losses,
       draws: base.draws,
       createdAt: base.createdAt,
+      inviteCode: base.inviteCode,
       members: (json['members'] as List? ?? const [])
           .whereType<Map>()
           .map((e) => TeamMember.fromJson(Map<String, dynamic>.from(e)))
           .toList(),
     );
   }
+}
+
+class TeamInvitePreview {
+  const TeamInvitePreview({
+    required this.teamId,
+    required this.name,
+    required this.membersCount,
+    required this.inviteCode,
+    this.logoUrl,
+    this.captainName,
+  });
+
+  final int teamId;
+  final String name;
+  final String? logoUrl;
+  final int membersCount;
+  final String? captainName;
+  final String inviteCode;
+
+  factory TeamInvitePreview.fromJson(Map<String, dynamic> json) =>
+      TeamInvitePreview(
+        teamId: json['team_id'] as int,
+        name: json['name'] as String? ?? '',
+        logoUrl: json['logo_url'] as String?,
+        membersCount: (json['members_count'] as num?)?.toInt() ?? 0,
+        captainName: json['captain_name'] as String?,
+        inviteCode: json['invite_code'] as String? ?? '',
+      );
 }
 
 class Game {
@@ -678,5 +711,128 @@ class TournamentDetail extends Tournament {
             .whereType<Map>()
             .map((e) => TournamentMatch.fromJson(Map<String, dynamic>.from(e)))
             .toList(),
+      );
+}
+
+
+class FreeAgentPost {
+  const FreeAgentPost({
+    required this.id,
+    required this.user,
+    required this.type,
+    required this.comment,
+    required this.status,
+    this.position,
+    this.date,
+    this.time,
+    this.locationText,
+    this.phone,
+    this.createdAt,
+  });
+
+  final int id;
+  final UserBrief user;
+  final String type;
+  final String comment;
+  final String status;
+  final String? position;
+  final String? date;
+  final String? time;
+  final String? locationText;
+  final String? phone;
+  final String? createdAt;
+
+  factory FreeAgentPost.fromJson(Map<String, dynamic> json) => FreeAgentPost(
+        id: json['id'] as int,
+        user: UserBrief.fromJson(Map<String, dynamic>.from(json['user'] as Map)),
+        type: json['type'] as String? ?? 'want_to_play',
+        comment: json['comment'] as String? ?? '',
+        status: json['status'] as String? ?? 'open',
+        position: json['position'] as String?,
+        date: json['date']?.toString(),
+        time: json['time']?.toString(),
+        locationText: json['location_text'] as String?,
+        phone: json['phone'] as String?,
+        createdAt: json['created_at']?.toString(),
+      );
+
+  bool get needPlayer => type == 'need_player';
+}
+
+class AppNotification {
+  const AppNotification({
+    required this.id,
+    required this.title,
+    required this.body,
+    required this.type,
+    required this.isRead,
+    this.link,
+    this.createdAt,
+  });
+
+  final int id;
+  final String title;
+  final String body;
+  final String type;
+  final bool isRead;
+  final String? link;
+  final String? createdAt;
+
+  factory AppNotification.fromJson(Map<String, dynamic> json) => AppNotification(
+        id: json['id'] as int,
+        title: json['title'] as String? ?? '',
+        body: json['body'] as String? ?? '',
+        type: json['type'] as String? ?? 'system',
+        isRead: json['is_read'] as bool? ?? false,
+        link: json['link'] as String?,
+        createdAt: json['created_at']?.toString(),
+      );
+}
+
+class WalletInfo {
+  const WalletInfo({
+    required this.balance,
+    required this.items,
+    this.total = 0,
+  });
+
+  final int balance;
+  final List<WalletTx> items;
+  final int total;
+
+  factory WalletInfo.fromJson(Map<String, dynamic> json) => WalletInfo(
+        balance: (json['balance'] as num?)?.toInt() ?? 0,
+        total: (json['total'] as num?)?.toInt() ?? 0,
+        items: ((json['items'] as List?) ?? const [])
+            .whereType<Map>()
+            .map((e) => WalletTx.fromJson(Map<String, dynamic>.from(e)))
+            .toList(),
+      );
+}
+
+class WalletTx {
+  const WalletTx({
+    required this.id,
+    required this.amount,
+    required this.balanceAfter,
+    required this.reason,
+    this.note,
+    this.createdAt,
+  });
+
+  final int id;
+  final int amount;
+  final int balanceAfter;
+  final String reason;
+  final String? note;
+  final String? createdAt;
+
+  factory WalletTx.fromJson(Map<String, dynamic> json) => WalletTx(
+        id: json['id'] as int,
+        amount: (json['amount'] as num?)?.toInt() ?? 0,
+        balanceAfter: (json['balance_after'] as num?)?.toInt() ?? 0,
+        reason: json['reason'] as String? ?? '',
+        note: json['note'] as String?,
+        createdAt: json['created_at']?.toString(),
       );
 }
