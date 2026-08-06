@@ -1,0 +1,510 @@
+import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../constants.dart';
+import 'token_storage.dart';
+import '../../shared/models/models.dart';
+
+export 'token_storage.dart';
+
+final apiClientProvider = Provider<ApiClient>((ref) {
+  return ApiClient(storage: ref.watch(tokenStorageProvider));
+});
+
+class ApiException implements Exception {
+  ApiException(this.message, {this.statusCode});
+
+  final String message;
+  final int? statusCode;
+
+  @override
+  String toString() => message;
+}
+
+class ApiClient {
+  ApiClient({required TokenStorage storage}) : _storage = storage {
+    _dio = Dio(
+      BaseOptions(
+        baseUrl: AppConstants.apiBase,
+        connectTimeout: const Duration(seconds: 20),
+        receiveTimeout: const Duration(seconds: 20),
+        headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+      ),
+    );
+
+    _dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) async {
+          final token = await _storage.getAccessToken();
+          if (token != null && token.isNotEmpty) {
+            options.headers['Authorization'] = 'Bearer $token';
+          }
+          handler.next(options);
+        },
+        onError: (error, handler) async {
+          final status = error.response?.statusCode;
+          final path = error.requestOptions.path;
+          final isAuthCall = path.contains('/auth/login') ||
+              path.contains('/auth/register') ||
+              path.contains('/auth/refresh');
+
+          if (status == 401 && !_refreshing && !isAuthCall) {
+            _refreshing = true;
+            try {
+              final refreshed = await _refreshTokens();
+              if (refreshed) {
+                final req = error.requestOptions;
+                final token = await _storage.getAccessToken();
+                req.headers['Authorization'] = 'Bearer $token';
+                final response = await _dio.fetch(req);
+                _refreshing = false;
+                return handler.resolve(response);
+              }
+            } catch (_) {
+              await _storage.clear();
+            } finally {
+              _refreshing = false;
+            }
+          }
+          handler.next(error);
+        },
+      ),
+    );
+  }
+
+  final TokenStorage _storage;
+  late final Dio _dio;
+  bool _refreshing = false;
+
+  Future<bool> _refreshTokens() async {
+    final refresh = await _storage.getRefreshToken();
+    if (refresh == null || refresh.isEmpty) return false;
+    final res = await Dio(
+      BaseOptions(baseUrl: AppConstants.apiBase),
+    ).post('/auth/refresh', data: {'refresh_token': refresh});
+    final data = Map<String, dynamic>.from(res.data as Map);
+    await _storage.saveTokens(
+      accessToken: data['access_token'] as String,
+      refreshToken: data['refresh_token'] as String,
+    );
+    return true;
+  }
+
+  Never _throwDio(DioException e) {
+    final data = e.response?.data;
+    String message = 'Tarmoq xatosi';
+    if (data is Map && data['detail'] != null) {
+      final detail = data['detail'];
+      if (detail is String) {
+        message = detail;
+      } else if (detail is List && detail.isNotEmpty) {
+        final first = detail.first;
+        if (first is Map && first['msg'] != null) {
+          message = first['msg'].toString();
+        } else {
+          message = detail.toString();
+        }
+      }
+    } else if (e.type == DioExceptionType.connectionTimeout ||
+        e.type == DioExceptionType.receiveTimeout) {
+      message = 'Server javob bermadi';
+    } else if (e.type == DioExceptionType.connectionError) {
+      message = 'Internet aloqasi yo‘q';
+    }
+    throw ApiException(message, statusCode: e.response?.statusCode);
+  }
+
+  Future<T> _get<T>(
+    String path, {
+    Map<String, dynamic>? query,
+    required T Function(dynamic data) parse,
+  }) async {
+    try {
+      final res = await _dio.get(path, queryParameters: query);
+      return parse(res.data);
+    } on DioException catch (e) {
+      _throwDio(e);
+    }
+  }
+
+  Future<T> _post<T>(
+    String path, {
+    Object? data,
+    required T Function(dynamic data) parse,
+  }) async {
+    try {
+      final res = await _dio.post(path, data: data);
+      return parse(res.data);
+    } on DioException catch (e) {
+      _throwDio(e);
+    }
+  }
+
+  Future<T> _patch<T>(
+    String path, {
+    Object? data,
+    required T Function(dynamic data) parse,
+  }) async {
+    try {
+      final res = await _dio.patch(path, data: data);
+      return parse(res.data);
+    } on DioException catch (e) {
+      _throwDio(e);
+    }
+  }
+
+  // —— Auth ——
+  Future<({User user, AuthTokens tokens})> register({
+    required String fullName,
+    required String phone,
+    required String password,
+  }) async {
+    final data = await _post(
+      '/auth/register',
+      data: {'full_name': fullName, 'phone': phone, 'password': password},
+      parse: (d) => Map<String, dynamic>.from(d as Map),
+    );
+    final tokens = AuthTokens(
+      accessToken: data['access_token'] as String,
+      refreshToken: data['refresh_token'] as String,
+    );
+    await _storage.saveTokens(
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+    );
+    return (user: User.fromJson(Map<String, dynamic>.from(data['user'] as Map)), tokens: tokens);
+  }
+
+  Future<({User user, AuthTokens tokens})> login({
+    required String phone,
+    required String password,
+  }) async {
+    final data = await _post(
+      '/auth/login',
+      data: {'phone': phone, 'password': password},
+      parse: (d) => Map<String, dynamic>.from(d as Map),
+    );
+    if (data['requires_2fa'] == true) {
+      throw ApiException('2FA yoqilgan. Hozircha web orqali kiring.');
+    }
+    final access = data['access_token'] as String?;
+    final refresh = data['refresh_token'] as String?;
+    if (access == null || refresh == null || data['user'] == null) {
+      throw ApiException('Login muvaffaqiyatsiz');
+    }
+    await _storage.saveTokens(accessToken: access, refreshToken: refresh);
+    return (
+      user: User.fromJson(Map<String, dynamic>.from(data['user'] as Map)),
+      tokens: AuthTokens(accessToken: access, refreshToken: refresh),
+    );
+  }
+
+  Future<User> me() => _get(
+        '/users/me',
+        parse: (d) => User.fromJson(Map<String, dynamic>.from(d as Map)),
+      );
+
+  Future<User> updateMe(Map<String, dynamic> payload) => _patch(
+        '/users/me',
+        data: payload,
+        parse: (d) => User.fromJson(Map<String, dynamic>.from(d as Map)),
+      );
+
+  Future<void> logout() => _storage.clear();
+
+  // —— Stadiums ——
+  Future<PageResult<Stadium>> listStadiums({
+    String? search,
+    String? district,
+    String sort = '-rating',
+    int limit = 20,
+    int offset = 0,
+  }) {
+    return _get(
+      '/stadiums',
+      query: {
+        if (search != null && search.isNotEmpty) 'search': search,
+        if (district != null && district.isNotEmpty) 'district': district,
+        'sort': sort,
+        'limit': limit,
+        'offset': offset,
+      },
+      parse: (d) => PageResult.fromJson(
+        Map<String, dynamic>.from(d as Map),
+        Stadium.fromJson,
+      ),
+    );
+  }
+
+  Future<Stadium> getStadium(int id) => _get(
+        '/stadiums/$id',
+        parse: (d) => Stadium.fromJson(Map<String, dynamic>.from(d as Map)),
+      );
+
+  Future<Availability> stadiumAvailability(int id, String date) => _get(
+        '/stadiums/$id/availability',
+        query: {'date': date},
+        parse: (d) => Availability.fromJson(Map<String, dynamic>.from(d as Map)),
+      );
+
+  Future<List<String>> districts() => _get(
+        '/stadiums/districts',
+        parse: (d) {
+          final map = Map<String, dynamic>.from(d as Map);
+          return (map['items'] as List? ?? const []).map((e) => e.toString()).toList();
+        },
+      );
+
+  // —— Bookings ——
+  Future<Booking> createBooking({
+    required int stadiumId,
+    required String date,
+    required String startTime,
+    required int durationHours,
+  }) =>
+      _post(
+        '/bookings',
+        data: {
+          'stadium_id': stadiumId,
+          'date': date,
+          'start_time': startTime,
+          'duration_hours': durationHours,
+        },
+        parse: (d) => Booking.fromJson(Map<String, dynamic>.from(d as Map)),
+      );
+
+  Future<PageResult<Booking>> myBookings({int limit = 20, int offset = 0}) =>
+      _get(
+        '/bookings/my',
+        query: {'limit': limit, 'offset': offset},
+        parse: (d) => PageResult.fromJson(
+          Map<String, dynamic>.from(d as Map),
+          Booking.fromJson,
+        ),
+      );
+
+  Future<Booking> payBooking(int id) => _post(
+        '/bookings/$id/pay',
+        parse: (d) => Booking.fromJson(Map<String, dynamic>.from(d as Map)),
+      );
+
+  Future<Booking> cancelBooking(int id) => _post(
+        '/bookings/$id/cancel',
+        parse: (d) => Booking.fromJson(Map<String, dynamic>.from(d as Map)),
+      );
+
+  // —— Games ——
+  Future<PageResult<Game>> listGames({
+    String? status,
+    int limit = 20,
+    int offset = 0,
+  }) =>
+      _get(
+        '/games',
+        query: {
+          if (status != null) 'status': status,
+          'limit': limit,
+          'offset': offset,
+        },
+        parse: (d) => PageResult.fromJson(
+          Map<String, dynamic>.from(d as Map),
+          Game.fromJson,
+        ),
+      );
+
+  Future<GameDetail> getGame(int id) => _get(
+        '/games/$id',
+        parse: (d) => GameDetail.fromJson(Map<String, dynamic>.from(d as Map)),
+      );
+
+  Future<GameDetail> joinGame(int id) => _post(
+        '/games/$id/join',
+        parse: (d) => GameDetail.fromJson(Map<String, dynamic>.from(d as Map)),
+      );
+
+  Future<GameDetail> leaveGame(int id) => _post(
+        '/games/$id/leave',
+        parse: (d) => GameDetail.fromJson(Map<String, dynamic>.from(d as Map)),
+      );
+
+  Future<GameDetail> createGame(Map<String, dynamic> payload) => _post(
+        '/games',
+        data: payload,
+        parse: (d) => GameDetail.fromJson(Map<String, dynamic>.from(d as Map)),
+      );
+
+  // —— Teams ——
+  Future<PageResult<Team>> listTeams({
+    String? search,
+    int limit = 20,
+    int offset = 0,
+  }) =>
+      _get(
+        '/teams',
+        query: {
+          if (search != null && search.isNotEmpty) 'search': search,
+          'limit': limit,
+          'offset': offset,
+        },
+        parse: (d) => PageResult.fromJson(
+          Map<String, dynamic>.from(d as Map),
+          Team.fromJson,
+        ),
+      );
+
+  Future<PageResult<Team>> myTeams({int limit = 20, int offset = 0}) => _get(
+        '/teams/my',
+        query: {'limit': limit, 'offset': offset},
+        parse: (d) => PageResult.fromJson(
+          Map<String, dynamic>.from(d as Map),
+          Team.fromJson,
+        ),
+      );
+
+  Future<TeamDetail> getTeam(int id) => _get(
+        '/teams/$id',
+        parse: (d) => TeamDetail.fromJson(Map<String, dynamic>.from(d as Map)),
+      );
+
+  Future<TeamDetail> createTeam({
+    required String name,
+    String? description,
+  }) =>
+      _post(
+        '/teams',
+        data: {
+          'name': name,
+          if (description != null && description.isNotEmpty) 'description': description,
+        },
+        parse: (d) => TeamDetail.fromJson(Map<String, dynamic>.from(d as Map)),
+      );
+
+  Future<TeamDetail> joinTeam(int id) => _post(
+        '/teams/$id/join',
+        parse: (d) => TeamDetail.fromJson(Map<String, dynamic>.from(d as Map)),
+      );
+
+  // —— Users ——
+  Future<User> getUser(int id) => _get(
+        '/users/$id',
+        parse: (d) => User.fromJson(Map<String, dynamic>.from(d as Map)),
+      );
+
+  // —— Clips / Lavhalar ——
+  Future<PageResult<MatchClip>> clipsFeed({int limit = 10, int offset = 0}) =>
+      _get(
+        '/clips/feed',
+        query: {'limit': limit, 'offset': offset},
+        parse: (d) => PageResult.fromJson(
+          Map<String, dynamic>.from(d as Map),
+          MatchClip.fromJson,
+        ),
+      );
+
+  Future<PageResult<MatchClip>> myClips({int limit = 30, int offset = 0}) =>
+      _get(
+        '/clips/mine',
+        query: {'limit': limit, 'offset': offset},
+        parse: (d) => PageResult.fromJson(
+          Map<String, dynamic>.from(d as Map),
+          MatchClip.fromJson,
+        ),
+      );
+
+  Future<PageResult<MatchClip>> userClips(
+    int userId, {
+    int limit = 30,
+    int offset = 0,
+  }) =>
+      _get(
+        '/clips/user/$userId',
+        query: {'limit': limit, 'offset': offset},
+        parse: (d) => PageResult.fromJson(
+          Map<String, dynamic>.from(d as Map),
+          MatchClip.fromJson,
+        ),
+      );
+
+  Future<MatchClip> toggleClipLike(int id) => _post(
+        '/clips/$id/like',
+        parse: (d) => MatchClip.fromJson(Map<String, dynamic>.from(d as Map)),
+      );
+
+  Future<void> viewClip(int id) async {
+    try {
+      await _dio.post('/clips/$id/view');
+    } on DioException catch (e) {
+      _throwDio(e);
+    }
+  }
+
+  Future<PageResult<ClipComment>> clipComments(
+    int clipId, {
+    int limit = 50,
+    int offset = 0,
+  }) =>
+      _get(
+        '/clips/$clipId/comments',
+        query: {'limit': limit, 'offset': offset},
+        parse: (d) => PageResult.fromJson(
+          Map<String, dynamic>.from(d as Map),
+          ClipComment.fromJson,
+        ),
+      );
+
+  Future<ClipComment> addClipComment(int clipId, String body) => _post(
+        '/clips/$clipId/comments',
+        data: {'body': body},
+        parse: (d) => ClipComment.fromJson(Map<String, dynamic>.from(d as Map)),
+      );
+
+  Future<void> deleteClipComment(int commentId) async {
+    try {
+      await _dio.delete('/clips/comments/$commentId');
+    } on DioException catch (e) {
+      _throwDio(e);
+    }
+  }
+
+  Future<MatchClip> uploadClip({
+    required String filePath,
+    required String fileName,
+    String? caption,
+  }) async {
+    try {
+      final form = FormData.fromMap({
+        'file': await MultipartFile.fromFile(filePath, filename: fileName),
+        if (caption != null && caption.trim().isNotEmpty) 'caption': caption.trim(),
+      });
+      final res = await _dio.post(
+        '/clips/upload',
+        data: form,
+        options: Options(
+          contentType: 'multipart/form-data',
+          sendTimeout: const Duration(minutes: 2),
+          receiveTimeout: const Duration(minutes: 2),
+        ),
+      );
+      return MatchClip.fromJson(Map<String, dynamic>.from(res.data as Map));
+    } on DioException catch (e) {
+      _throwDio(e);
+    }
+  }
+
+  // —— Tournaments ——
+  Future<PageResult<Tournament>> listTournaments({int limit = 30, int offset = 0}) =>
+      _get(
+        '/tournaments',
+        query: {'limit': limit, 'offset': offset},
+        parse: (d) => PageResult.fromJson(
+          Map<String, dynamic>.from(d as Map),
+          Tournament.fromJson,
+        ),
+      );
+
+  Future<TournamentDetail> getTournament(int id) => _get(
+        '/tournaments/$id',
+        parse: (d) => TournamentDetail.fromJson(Map<String, dynamic>.from(d as Map)),
+      );
+
+}
