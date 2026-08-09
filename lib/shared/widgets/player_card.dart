@@ -68,16 +68,49 @@ class PlayerCard extends StatelessWidget {
   final int? stamina;
   final bool showFullStatsOnTap;
 
+  static String normalizePos(String? p) => _pos(p);
+
   static String _pos(String? p) {
     if (p == null || p.isEmpty) return 'CM';
     final s = p.toUpperCase();
-    if (s.length <= 3) return s;
+    if (s == 'GK' || s == 'CB' || s == 'LB' || s == 'RB' || s == 'CDM' ||
+        s == 'CM' || s == 'CAM' || s == 'LW' || s == 'RW' || s == 'ST') {
+      return s;
+    }
+    if (s.length <= 3 && RegExp(r'^[A-Z]+$').hasMatch(s)) return s;
     if (s.contains('DARVOZA') || s.contains('GK')) return 'GK';
     if (s.contains('HIMOY') || s.contains('DEF')) return 'CB';
     if (s.contains('YARIM')) return 'CM';
     if (s.contains('HUJUM') || s.contains('ST')) return 'ST';
-    return s.substring(0, 2);
+    return s.length >= 2 ? s.substring(0, 2) : 'CM';
   }
+
+  static String positionLabelUz(String? p) {
+    final code = _pos(p);
+    return switch (code) {
+      'GK' => 'Darvozabon',
+      'CB' => 'Markaziy himoyachi',
+      'LB' => 'Chap himoyachi',
+      'RB' => 'O‘ng himoyachi',
+      'CDM' => 'Himoyaviy yarim',
+      'CM' => 'Yarim himoyachi',
+      'CAM' => 'Hujumkor yarim',
+      'LW' => 'Chap qanot',
+      'RW' => 'O‘ng qanot',
+      'ST' => 'Hujumchi',
+      _ => code,
+    };
+  }
+
+  static String attrLabelUz(String code) => switch (code) {
+        'PAC' => 'Tezlik',
+        'SHO' => 'Zarba',
+        'PAS' => 'Uzatma',
+        'DRI' => 'Dribling',
+        'DEF' => 'Himoya',
+        'PHY' => 'Jismoniy',
+        _ => code,
+      };
 
   Color get _tier {
     if (overall >= 80) return const Color(0xFFE8B923);
@@ -208,6 +241,38 @@ class PlayerCard extends StatelessWidget {
         child: Stack(
           clipBehavior: Clip.none,
           children: [
+            // Profil FIFA: o‘yinchi rasmi butun karta fonida
+            if (profile && avatarUrl != null && avatarUrl!.isNotEmpty)
+              Positioned.fill(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(18),
+                  child: CachedNetworkImage(
+                    imageUrl: avatarUrl!,
+                    fit: BoxFit.cover,
+                    memCacheWidth: 480,
+                    fadeInDuration: const Duration(milliseconds: 80),
+                    errorWidget: (_, __, ___) => const SizedBox.shrink(),
+                  ),
+                ),
+              ),
+            if (profile)
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(18),
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.black.withValues(alpha: 0.25),
+                        Colors.black.withValues(alpha: 0.15),
+                        Colors.black.withValues(alpha: 0.82),
+                      ],
+                      stops: const [0, 0.45, 1],
+                    ),
+                  ),
+                ),
+              ),
             Positioned.fill(
               child: Padding(
                 padding: const EdgeInsets.all(3),
@@ -216,15 +281,17 @@ class PlayerCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(profile ? 15 : 11),
                     border: Border.all(
                         color: Colors.white.withValues(alpha: 0.16)),
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.white.withValues(alpha: 0.06),
-                        Colors.transparent,
-                        Colors.black.withValues(alpha: 0.35),
-                      ],
-                    ),
+                    gradient: profile
+                        ? null
+                        : LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.white.withValues(alpha: 0.06),
+                              Colors.transparent,
+                              Colors.black.withValues(alpha: 0.35),
+                            ],
+                          ),
                   ),
                 ),
               ),
@@ -264,6 +331,15 @@ class PlayerCard extends StatelessWidget {
                               color: Colors.white.withValues(alpha: 0.95),
                             ),
                           ),
+                          if (profile)
+                            Text(
+                              positionLabelUz(position),
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white.withValues(alpha: 0.7),
+                              ),
+                            ),
                         ],
                       ),
                       const Spacer(),
@@ -271,68 +347,71 @@ class PlayerCard extends StatelessWidget {
                     ],
                   ),
                   SizedBox(height: compact ? 4 : 6),
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: _tier, width: 2),
-                        boxShadow: [
-                          BoxShadow(
-                            color: _tier.withValues(alpha: 0.4),
-                            blurRadius: 12,
+                  if (profile)
+                    const Spacer()
+                  else
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: _tier, width: 2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: _tier.withValues(alpha: 0.4),
+                              blurRadius: 12,
+                            ),
+                          ],
+                        ),
+                        child: ClipOval(
+                          child: SizedBox(
+                            width: compact ? 40 : 60,
+                            height: compact ? 40 : 60,
+                            child: avatarUrl != null && avatarUrl!.isNotEmpty
+                                ? CachedNetworkImage(
+                                    imageUrl: avatarUrl!,
+                                    fit: BoxFit.cover,
+                                    memCacheWidth: compact ? 80 : 120,
+                                    fadeInDuration:
+                                        const Duration(milliseconds: 60),
+                                    fadeOutDuration: Duration.zero,
+                                    placeholder: (_, __) => Container(
+                                      color: Colors.black45,
+                                      alignment: Alignment.center,
+                                      child: Text(
+                                        name.isNotEmpty ? name[0] : '?',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: compact ? 14 : 20,
+                                        ),
+                                      ),
+                                    ),
+                                    errorWidget: (_, __, ___) => Container(
+                                      color: Colors.black45,
+                                      alignment: Alignment.center,
+                                      child: Text(
+                                        name.isNotEmpty ? name[0] : '?',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: compact ? 14 : 20,
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                : Container(
+                                    color: Colors.black45,
+                                    alignment: Alignment.center,
+                                    child: Text(
+                                      name.isNotEmpty ? name[0] : '?',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: compact ? 14 : 20,
+                                      ),
+                                    ),
+                                  ),
                           ),
-                        ],
-                      ),
-                      child: ClipOval(
-                        child: SizedBox(
-                          width: compact ? 40 : (profile ? 96 : 60),
-                          height: compact ? 40 : (profile ? 96 : 60),
-                          child: avatarUrl != null && avatarUrl!.isNotEmpty
-                              ? CachedNetworkImage(
-                                  imageUrl: avatarUrl!,
-                                  fit: BoxFit.cover,
-                                  memCacheWidth: profile ? 192 : (compact ? 80 : 120),
-                                  fadeInDuration:
-                                      const Duration(milliseconds: 60),
-                                  fadeOutDuration: Duration.zero,
-                                  placeholder: (_, __) => Container(
-                                    color: Colors.black45,
-                                    alignment: Alignment.center,
-                                    child: Text(
-                                      name.isNotEmpty ? name[0] : '?',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: compact ? 14 : 20,
-                                      ),
-                                    ),
-                                  ),
-                                  errorWidget: (_, __, ___) => Container(
-                                    color: Colors.black45,
-                                    alignment: Alignment.center,
-                                    child: Text(
-                                      name.isNotEmpty ? name[0] : '?',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: compact ? 14 : 20,
-                                      ),
-                                    ),
-                                  ),
-                                )
-                              : Container(
-                                  color: Colors.black45,
-                                  alignment: Alignment.center,
-                                  child: Text(
-                                    name.isNotEmpty ? name[0] : '?',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: compact ? 14 : 20,
-                                    ),
-                                  ),
-                                ),
                         ),
                       ),
                     ),
-                  ),
                   const SizedBox(height: 4),
                   Text(
                     name,
@@ -352,18 +431,18 @@ class PlayerCard extends StatelessWidget {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              _mini('PAC', pac),
-                              _mini('SHO', sho),
-                              _mini('PAS', pas),
+                              _mini('PAC', pac, uz: true),
+                              _mini('SHO', sho, uz: true),
+                              _mini('PAS', pas, uz: true),
                             ],
                           ),
                           const SizedBox(height: 4),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              _mini('DRI', dri),
-                              _mini('DEF', def),
-                              _mini('PHY', phy),
+                              _mini('DRI', dri, uz: true),
+                              _mini('DEF', def, uz: true),
+                              _mini('PHY', phy, uz: true),
                             ],
                           ),
                         ],
@@ -381,6 +460,43 @@ class PlayerCard extends StatelessWidget {
                 ],
               ),
             ),
+            if (profile)
+              Positioned(
+                top: 12,
+                right: 12,
+                child: Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: _tier, width: 2.5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.5),
+                        blurRadius: 10,
+                      ),
+                    ],
+                  ),
+                  child: ClipOval(
+                    child: avatarUrl != null && avatarUrl!.isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl: avatarUrl!,
+                            fit: BoxFit.cover,
+                            memCacheWidth: 128,
+                            errorWidget: (_, __, ___) => Container(
+                              color: Colors.black54,
+                              alignment: Alignment.center,
+                              child: Text(name.isNotEmpty ? name[0] : '?'),
+                            ),
+                          )
+                        : Container(
+                            color: Colors.black54,
+                            alignment: Alignment.center,
+                            child: Text(name.isNotEmpty ? name[0] : '?'),
+                          ),
+                  ),
+                ),
+              ),
             if (isCaptain)
               Positioned(
                 top: 6,
@@ -406,14 +522,14 @@ class PlayerCard extends StatelessWidget {
     );
   }
 
-  Widget _mini(String k, int v) => Column(
+  Widget _mini(String k, int v, {bool uz = false}) => Column(
         children: [
           Text('$v',
               style: const TextStyle(
                   fontSize: 10, fontWeight: FontWeight.w900, height: 1)),
-          Text(k,
+          Text(uz ? attrLabelUz(k) : k,
               style: TextStyle(
-                  fontSize: 7,
+                  fontSize: uz ? 6.5 : 7,
                   color: Colors.white.withValues(alpha: 0.55),
                   height: 1.2)),
         ],
@@ -538,6 +654,7 @@ class PitchFormation extends StatelessWidget {
           Offset(0.78, 0.22),
         ];
       default:
+        // 7v7: GK, LB, CB, RB, LM, RM, ST
         return const [
           Offset(0.5, 0.90),
           Offset(0.22, 0.68),
@@ -550,11 +667,86 @@ class PitchFormation extends StatelessWidget {
     }
   }
 
+  /// Pozitsiya → slot index (GK darvozada, ST hujumda).
+  static int slotIndexFor(String? position, int formatSize) {
+    final p = PlayerCard.normalizePos(position);
+    if (formatSize == 5) {
+      return switch (p) {
+        'GK' => 0,
+        'LB' || 'CB' || 'CDM' => 1,
+        'RB' || 'DEF' => 2,
+        'LW' || 'CM' || 'CAM' => 3,
+        _ => 4, // ST / RW
+      };
+    }
+    if (formatSize == 11) {
+      return switch (p) {
+        'GK' => 0,
+        'LB' => 1,
+        'CB' => 2,
+        'CDM' => 3,
+        'RB' => 4,
+        'CM' => 5,
+        'CAM' => 6,
+        'RM' || 'RW' => 7,
+        'LW' => 8,
+        'ST' => 9,
+        _ => 10,
+      };
+    }
+    // 7v7
+    return switch (p) {
+      'GK' => 0,
+      'LB' => 1,
+      'CB' || 'CDM' => 2,
+      'RB' => 3,
+      'CM' || 'CAM' || 'LW' => 4,
+      'RW' || 'RM' => 5,
+      _ => 6, // ST
+    };
+  }
+
+  /// A'zolarni pozitsiya bo‘yicha slotlarga joylashtirish (to‘qnashuvsiz).
+  List<({TeamMember member, int slot})> _placed(List<Offset> slots) {
+    final used = <int>{};
+    final out = <({TeamMember member, int slot})>[];
+    final pending = members.take(slots.length).toList();
+
+    for (final m in pending) {
+      var slot = slotIndexFor(m.user.position, formatSize).clamp(0, slots.length - 1);
+      if (used.contains(slot)) {
+        // Eng yaqin bo‘sh slot
+        var found = false;
+        for (var d = 1; d < slots.length && !found; d++) {
+          for (final cand in [slot - d, slot + d]) {
+            if (cand >= 0 && cand < slots.length && !used.contains(cand)) {
+              slot = cand;
+              found = true;
+              break;
+            }
+          }
+        }
+        if (!found) {
+          for (var i = 0; i < slots.length; i++) {
+            if (!used.contains(i)) {
+              slot = i;
+              break;
+            }
+          }
+        }
+      }
+      used.add(slot);
+      out.add((member: m, slot: slot));
+    }
+    return out;
+  }
+
   @override
   Widget build(BuildContext context) {
     final slots = _slots;
-    final shown = members.take(slots.length).toList();
-    final emptyCount = (slots.length - shown.length).clamp(0, slots.length);
+    final placed = _placed(slots);
+    final usedSlots = placed.map((e) => e.slot).toSet();
+    final emptyCount = (slots.length - placed.length).clamp(0, slots.length);
     return AspectRatio(
       aspectRatio: 0.72,
       child: Container(
@@ -617,43 +809,43 @@ class PitchFormation extends StatelessWidget {
                       ),
                     ),
                   ),
-                for (var i = 0; i < shown.length; i++)
+                for (final p in placed)
                   Positioned(
-                    left: slots[i].dx * c.maxWidth - 38,
-                    top: slots[i].dy * c.maxHeight - 50,
+                    left: slots[p.slot].dx * c.maxWidth - 38,
+                    top: slots[p.slot].dy * c.maxHeight - 50,
                     child: PlayerCard.fromUser(
-                      shown[i].user,
-                      isCaptain: shown[i].user.id == captainId ||
-                          shown[i].role == 'captain',
+                      p.member.user,
+                      isCaptain: p.member.user.id == captainId ||
+                          p.member.role == 'captain',
                       compact: true,
                       showFullStatsOnTap: true,
                       onTap: onPlayerTap == null
                           ? null
-                          : () => onPlayerTap!(shown[i].user),
+                          : () => onPlayerTap!(p.member.user),
                     ),
                   ),
-                // Empty slot ghosts
                 if (emptySlotsHint)
-                  for (var i = shown.length; i < slots.length; i++)
-                    Positioned(
-                      left: slots[i].dx * c.maxWidth - 18,
-                      top: slots[i].dy * c.maxHeight - 18,
-                      child: Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.28),
-                            width: 1.5,
+                  for (var i = 0; i < slots.length; i++)
+                    if (!usedSlots.contains(i))
+                      Positioned(
+                        left: slots[i].dx * c.maxWidth - 18,
+                        top: slots[i].dy * c.maxHeight - 18,
+                        child: Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.28),
+                              width: 1.5,
+                            ),
+                            color: Colors.black26,
                           ),
-                          color: Colors.black26,
+                          child: Icon(Icons.add,
+                              size: 16,
+                              color: Colors.white.withValues(alpha: 0.35)),
                         ),
-                        child: Icon(Icons.add,
-                            size: 16,
-                            color: Colors.white.withValues(alpha: 0.35)),
                       ),
-                    ),
               ],
             );
           },

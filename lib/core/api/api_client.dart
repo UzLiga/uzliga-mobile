@@ -329,12 +329,41 @@ class ApiClient {
     }
   }
 
-  Future<Map<String, dynamic>> subscribePremium({String provider = 'fake'}) =>
+  Future<Map<String, dynamic>> subscribePremium({String provider = 'card'}) =>
       _post(
         '/premium/subscribe',
         data: {'provider': provider},
         parse: (d) => Map<String, dynamic>.from(d as Map),
       );
+
+  Future<Map<String, dynamic>> premiumStatus() => _get(
+        '/premium/status',
+        parse: (d) => Map<String, dynamic>.from(d as Map),
+      );
+
+  Future<Map<String, dynamic>> uploadPremiumPaymentProof({
+    required int paymentId,
+    required String filePath,
+    String fileName = 'premium_proof.jpg',
+  }) async {
+    try {
+      final form = FormData.fromMap({
+        'file': await MultipartFile.fromFile(filePath, filename: fileName),
+      });
+      final res = await _dio.post(
+        '/premium/payments/$paymentId/proof',
+        data: form,
+        options: Options(
+          contentType: 'multipart/form-data',
+          sendTimeout: const Duration(minutes: 2),
+          receiveTimeout: const Duration(minutes: 2),
+        ),
+      );
+      return Map<String, dynamic>.from(res.data as Map);
+    } on DioException catch (e) {
+      _throwDio(e);
+    }
+  }
 
   Future<void> logout() => _storage.clear();
 

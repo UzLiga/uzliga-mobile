@@ -40,6 +40,10 @@ class ProfileScreen extends ConsumerWidget {
     final auth = ref.watch(authProvider);
     final user = auth.user;
     final clips = ref.watch(myClipsProvider);
+    final themeMode = ref.watch(themeModeProvider);
+    final isDark = themeMode == ThemeMode.dark ||
+        (themeMode == ThemeMode.system &&
+            MediaQuery.platformBrightnessOf(context) == Brightness.dark);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -60,9 +64,14 @@ class ProfileScreen extends ConsumerWidget {
                     title: const Text('Profil'),
                     actions: [
                       IconButton(
-                        tooltip: 'Tahrirlash',
-                        onPressed: () => _openEdit(context, ref, user),
-                        icon: const Icon(Icons.edit_outlined),
+                        tooltip: isDark ? 'Yorug‘ rejim' : 'Qorong‘u rejim',
+                        onPressed: () =>
+                            ref.read(themeModeProvider.notifier).toggle(),
+                        icon: Icon(
+                          isDark
+                              ? Icons.light_mode_outlined
+                              : Icons.dark_mode_outlined,
+                        ),
                       ),
                     ],
                   ),
@@ -70,11 +79,29 @@ class ProfileScreen extends ConsumerWidget {
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
                     sliver: SliverList(
                       delegate: SliverChildListDelegate([
-                        _HeroHeader(user: user),
+                        DecoratedBox(
+                          decoration: BoxDecoration(
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.22),
+                                blurRadius: 18,
+                                offset: const Offset(0, 6),
+                                spreadRadius: -8,
+                              ),
+                            ],
+                          ),
+                          child: const SizedBox(
+                            width: double.infinity,
+                            height: 1,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        GestureDetector(
+                          onLongPress: () => _openEdit(context, ref, user),
+                          child: _HeroHeader(user: user),
+                        ),
                         const SizedBox(height: 16),
                         _PremiumFifaSection(user: user),
-                        const SizedBox(height: 16),
-                        _PerformanceGrid(user: user),
                         const SizedBox(height: 16),
                         _MyPositionSection(user: user),
                         const SizedBox(height: 16),
@@ -85,13 +112,7 @@ class ProfileScreen extends ConsumerWidget {
                           _ReferralCard(code: user.referralCode!),
                           const SizedBox(height: 16),
                         ],
-                        _SectionTitle(
-                          title: 'Tezkor',
-                          action: TextButton(
-                            onPressed: () => _openEdit(context, ref, user),
-                            child: const Text('Tahrirlash'),
-                          ),
-                        ),
+                        const _SectionTitle(title: 'Tezkor'),
                         const SizedBox(height: 8),
                         FilledButton.tonalIcon(
                           onPressed: () async {
@@ -126,89 +147,24 @@ class ProfileScreen extends ConsumerWidget {
                           items: [
                             _QuickItem(
                               icon: Icons.calendar_month_outlined,
-                              label: 'Bronlar',
+                              label: 'Bronlarim',
                               onTap: () => context.push('/app/bookings'),
                             ),
                             _QuickItem(
                               icon: Icons.account_balance_wallet_outlined,
-                              label: 'Hamyon',
+                              label: 'Hamyonim',
                               onTap: () => context.push('/app/wallet'),
                             ),
                             _QuickItem(
-                              icon: Icons.map_outlined,
-                              label: 'Xarita',
-                              onTap: () => context.push('/app/map'),
-                            ),
-                            _QuickItem(
-                              icon: Icons.emoji_events_outlined,
-                              label: 'Turnir',
-                              onTap: () => context.push('/app/tournaments'),
-                            ),
-                            _QuickItem(
                               icon: Icons.groups_outlined,
-                              label: 'Jamoa',
+                              label: 'Jamoam',
                               onTap: () => context.push('/app/teams'),
-                            ),
-                            _QuickItem(
-                              icon: Icons.flash_on_outlined,
-                              label: 'Battle',
-                              onTap: () => context.push('/app/battles'),
-                            ),
-                            _QuickItem(
-                              icon: Icons.sports_soccer_outlined,
-                              label: 'O‘yinlar',
-                              onTap: () => context.go('/app/games'),
-                            ),
-                            _QuickItem(
-                              icon: Icons.movie_filter_outlined,
-                              label: 'Reels',
-                              onTap: () => context.go('/app/reels'),
-                            ),
-                            _QuickItem(
-                              icon: Icons.notifications_outlined,
-                              label: 'Xabar',
-                              onTap: () => context.push('/app/notifications'),
                             ),
                           ],
                         ),
                         const SizedBox(height: 16),
                         _MenuCard(
                           children: [
-                            _MenuTile(
-                              icon: Icons.edit_outlined,
-                              title: 'Profilni tahrirlash',
-                              subtitle: 'Ism, rasm, pozitsiya, bo‘y/vazn',
-                              onTap: () => _openEdit(context, ref, user),
-                            ),
-                            Consumer(
-                              builder: (context, ref, _) {
-                                final mode = ref.watch(themeModeProvider);
-                                final isDark = mode == ThemeMode.dark ||
-                                    (mode == ThemeMode.system &&
-                                        MediaQuery.platformBrightnessOf(
-                                                context) ==
-                                            Brightness.dark);
-                                return _MenuTile(
-                                  icon: isDark
-                                      ? Icons.dark_mode_outlined
-                                      : Icons.light_mode_outlined,
-                                  title: 'Ko‘rinish',
-                                  subtitle: isDark
-                                      ? 'Qorong‘u (Dark)'
-                                      : 'Yorug‘ (Light)',
-                                  trailing: Switch.adaptive(
-                                    value: isDark,
-                                    activeTrackColor: AppColors.primary,
-                                    onChanged: (_) => ref
-                                        .read(themeModeProvider.notifier)
-                                        .toggle(),
-                                  ),
-                                  onTap: () => ref
-                                      .read(themeModeProvider.notifier)
-                                      .toggle(),
-                                );
-                              },
-                            ),
                             _MenuTile(
                               icon: Icons.telegram,
                               title: 'Telegram bot',
@@ -342,43 +298,58 @@ class ProfileScreen extends ConsumerWidget {
   }
 }
 
+String _positionCode(String? position) {
+  final p = (position ?? '').toUpperCase().trim();
+  if (p.isEmpty) return 'CM';
+  if (p.length <= 3) return p;
+  if (p.contains('DARVOZA') || p.contains('GK')) return 'GK';
+  if (p.contains('HIMOY') || p.contains('DEF')) return 'CB';
+  if (p.contains('YARIM')) return 'CM';
+  if (p.contains('HUJUM') || p.contains('ST')) return 'ST';
+  return p.substring(0, math.min(3, p.length));
+}
+
+String _positionLine(String? position) {
+  final code = _positionCode(position);
+  return '$code · ${PlayerCard.positionLabelUz(position)}';
+}
+
 class _HeroHeader extends StatelessWidget {
   const _HeroHeader({required this.user});
   final User user;
 
-  String get _posShort {
-    final p = (user.position ?? '').toUpperCase();
-    if (p.isEmpty) return 'CM';
-    if (p.length <= 3) return p;
-    if (p.contains('DARVOZA') || p.contains('GK')) return 'GK';
-    if (p.contains('HIMOY') || p.contains('DEF')) return 'CB';
-    if (p.contains('YARIM')) return 'CM';
-    if (p.contains('HUJUM') || p.contains('ST')) return 'ST';
-    return p.substring(0, 2);
-  }
-
   @override
   Widget build(BuildContext context) {
-    final ring = user.isPremium ? AppColors.gold : AppColors.lime;
+    final premium = user.isPremium;
+    final ring = premium ? AppColors.gold : AppColors.lime;
+    final frame = premium
+        ? AppColors.gold.withValues(alpha: 0.75)
+        : AppColors.lime.withValues(alpha: 0.2);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(18, 22, 18, 20),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
-        gradient: const RadialGradient(
-          center: Alignment(0, -0.55),
+        gradient: RadialGradient(
+          center: const Alignment(0, -0.55),
           radius: 1.15,
-          colors: [
-            Color(0xFF163528),
-            Color(0xFF07110B),
-            Color(0xFF050807),
-          ],
+          colors: premium
+              ? const [
+                  Color(0xFF3A2A0C),
+                  Color(0xFF1A1408),
+                  Color(0xFF0A0905),
+                ]
+              : const [
+                  Color(0xFF163528),
+                  Color(0xFF07110B),
+                  Color(0xFF050807),
+                ],
         ),
-        border: Border.all(color: AppColors.lime.withValues(alpha: 0.2)),
+        border: Border.all(color: frame, width: premium ? 2 : 1),
         boxShadow: [
           BoxShadow(
-            color: AppColors.lime.withValues(alpha: 0.08),
-            blurRadius: 28,
+            color: ring.withValues(alpha: premium ? 0.28 : 0.08),
+            blurRadius: premium ? 32 : 28,
             offset: const Offset(0, 10),
           ),
         ],
@@ -386,12 +357,12 @@ class _HeroHeader extends StatelessWidget {
       child: Column(
         children: [
           Text(
-            'FOOTBALL IDENTITY',
+            'FUTBOL IDENTITETI',
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w900,
               letterSpacing: 2.2,
-              color: AppColors.lime.withValues(alpha: 0.85),
+              color: ring.withValues(alpha: 0.9),
             ),
           ),
           const SizedBox(height: 14),
@@ -403,7 +374,7 @@ class _HeroHeader extends StatelessWidget {
                 height: 104,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(color: ring, width: 2.5),
+                  border: Border.all(color: ring, width: premium ? 3 : 2.5),
                   boxShadow: [
                     BoxShadow(
                       color: ring.withValues(alpha: 0.35),
@@ -442,8 +413,9 @@ class _HeroHeader extends StatelessWidget {
                       color: Color(0xFF050807),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.verified,
-                        color: AppColors.lime, size: 20),
+                    child: Icon(Icons.verified,
+                        color: premium ? AppColors.gold : AppColors.lime,
+                        size: 20),
                   ),
                 ),
             ],
@@ -461,14 +433,15 @@ class _HeroHeader extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            '$_posShort  ·  ${user.overall} OVR',
+            '${_positionLine(user.position)}  ·  ${user.overall} OVR',
+            textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w700,
               color: AppColors.ink.withValues(alpha: 0.75),
             ),
           ),
-          if (user.isPremium) ...[
+          if (premium) ...[
             const SizedBox(height: 4),
             const Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -485,28 +458,33 @@ class _HeroHeader extends StatelessWidget {
               ],
             ),
           ],
-          const SizedBox(height: 16),
+          const SizedBox(height: 18),
           Row(
             children: [
               Expanded(
                 child: _HeroStat(
                   value: '${user.goals}',
-                  label: 'GOALS',
+                  label: 'Gollar',
                   icon: '⚽',
+                  emphasize: true,
+                  accent: premium ? AppColors.gold : AppColors.lime,
                 ),
               ),
               Expanded(
                 child: _HeroStat(
                   value: '${user.assists}',
-                  label: 'ASSISTS',
+                  label: 'Uzatmalar',
                   icon: '🎯',
+                  emphasize: true,
+                  accent: premium ? AppColors.gold : AppColors.lime,
                 ),
               ),
               Expanded(
                 child: _HeroStat(
                   value: user.rating.toStringAsFixed(1),
-                  label: 'RATING',
+                  label: 'Reyting',
                   icon: '⭐',
+                  accent: AppColors.lime,
                 ),
               ),
             ],
@@ -522,117 +500,34 @@ class _HeroStat extends StatelessWidget {
     required this.value,
     required this.label,
     required this.icon,
+    this.emphasize = false,
+    this.accent = AppColors.lime,
   });
   final String value;
   final String label;
   final String icon;
+  final bool emphasize;
+  final Color accent;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
         Text('$icon $value',
-            style: const TextStyle(
-              fontSize: 18,
+            style: TextStyle(
+              fontSize: emphasize ? 24 : 16,
               fontWeight: FontWeight.w900,
-              color: AppColors.lime,
+              color: accent,
+              height: 1.05,
             )),
-        const SizedBox(height: 2),
+        const SizedBox(height: 4),
         Text(label,
-            style: const TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1,
-              color: AppColors.muted,
+            style: TextStyle(
+              fontSize: emphasize ? 12 : 10,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.4,
+              color: emphasize ? AppColors.ink.withValues(alpha: 0.8) : AppColors.muted,
             )),
-      ],
-    );
-  }
-}
-
-class _PerformanceGrid extends StatelessWidget {
-  const _PerformanceGrid({required this.user});
-  final User user;
-
-  @override
-  Widget build(BuildContext context) {
-    final items = [
-      ('PAC', user.pace),
-      ('SHO', user.shooting),
-      ('PAS', user.passing),
-      ('DRI', user.dribbling),
-      ('DEF', user.defending),
-      ('PHY', user.stamina),
-    ];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          '⚡ PERFORMANCE',
-          style: TextStyle(
-            fontWeight: FontWeight.w900,
-            fontSize: 13,
-            letterSpacing: 1.4,
-            color: AppColors.lime,
-          ),
-        ),
-        const SizedBox(height: 10),
-        GridView.count(
-          crossAxisCount: 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 8,
-          crossAxisSpacing: 8,
-          childAspectRatio: 2.2,
-          children: [
-            for (final it in items)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
-                  color: const Color(0xFF0D1711),
-                  border: Border.all(
-                    color: AppColors.lime.withValues(alpha: 0.18),
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      '${it.$2}',
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.lime,
-                        height: 1,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      it.$1,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1.2,
-                        color: AppColors.muted,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(99),
-                      child: LinearProgressIndicator(
-                        value: (it.$2 / 99).clamp(0.0, 1.0),
-                        minHeight: 4,
-                        backgroundColor: Colors.white10,
-                        color: AppColors.lime,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-          ],
-        ),
       ],
     );
   }
@@ -674,7 +569,7 @@ class _PremiumFifaSection extends ConsumerWidget {
             const SizedBox(height: 10),
             const Text(
               'FIFA karta va karyera (flip) — faqat Premium da.\n'
-              'O‘yin · gol · assist · sariq/qizil · reyting orqa tomonda.',
+              'O‘yin · gol · uzatma · sariq/qizil · reyting orqa tomonda.',
               style: TextStyle(color: AppColors.muted, fontSize: 13),
             ),
             const SizedBox(height: 14),
@@ -756,18 +651,22 @@ class _FifaFlipCardState extends State<_FifaFlipCard>
             GestureDetector(
               onTap: _flip,
               onHorizontalDragEnd: _onDragEnd,
-              child: Transform(
-                alignment: Alignment.center,
-                transform: Matrix4.identity()
-                  ..setEntry(3, 2, 0.0012)
-                  ..rotateY(angle),
-                child: showBack
-                    ? Transform(
-                        alignment: Alignment.center,
-                        transform: Matrix4.identity()..rotateY(math.pi),
-                        child: _CareerBack(user: user),
-                      )
-                    : _FifaFront(user: user),
+              child: SizedBox(
+                height: 460,
+                width: double.infinity,
+                child: Transform(
+                  alignment: Alignment.center,
+                  transform: Matrix4.identity()
+                    ..setEntry(3, 2, 0.0012)
+                    ..rotateY(angle),
+                  child: showBack
+                      ? Transform(
+                          alignment: Alignment.center,
+                          transform: Matrix4.identity()..rotateY(math.pi),
+                          child: _CareerBack(user: user),
+                        )
+                      : _FifaFront(user: user),
+                ),
               ),
             ),
             const SizedBox(height: 10),
@@ -798,6 +697,7 @@ class _FifaFront extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
+      height: double.infinity,
       padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(22),
@@ -841,19 +741,23 @@ class _FifaFront extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          PlayerCard(
-            name: user.firstName.toUpperCase(),
-            overall: user.overall,
-            position: user.position,
-            avatarUrl: user.avatarUrl,
-            pace: user.pace,
-            shooting: user.shooting,
-            passing: user.passing,
-            dribbling: user.dribbling,
-            defending: user.defending,
-            stamina: user.stamina,
-            profile: true,
-            showFullStatsOnTap: false,
+          Expanded(
+            child: Center(
+              child: PlayerCard(
+                name: user.firstName.toUpperCase(),
+                overall: user.overall,
+                position: user.position,
+                avatarUrl: user.avatarUrl,
+                pace: user.pace,
+                shooting: user.shooting,
+                passing: user.passing,
+                dribbling: user.dribbling,
+                defending: user.defending,
+                stamina: user.stamina,
+                profile: true,
+                showFullStatsOnTap: false,
+              ),
+            ),
           ),
           const SizedBox(height: 14),
           _MiniAttrs(user: user),
@@ -920,6 +824,7 @@ class _CareerBack extends StatelessWidget {
 
     return Container(
       width: double.infinity,
+      height: double.infinity,
       padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(22),
@@ -941,11 +846,11 @@ class _CareerBack extends StatelessWidget {
               const Icon(Icons.military_tech, color: Color(0xFFE8B923), size: 20),
               const SizedBox(width: 8),
               const Text(
-                'CAREER',
+                'Karyera',
                 style: TextStyle(
                   fontWeight: FontWeight.w900,
-                  fontSize: 13,
-                  letterSpacing: 1.6,
+                  fontSize: 15,
+                  letterSpacing: 0.6,
                 ),
               ),
               const Spacer(),
@@ -957,11 +862,11 @@ class _CareerBack extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  'LEVEL ${user.careerLevel}',
+                  'Daraja ${user.careerLevel}',
                   style: const TextStyle(
                     color: Color(0xFFE8B923),
                     fontWeight: FontWeight.w900,
-                    letterSpacing: 0.8,
+                    letterSpacing: 0.4,
                   ),
                 ),
               ),
@@ -996,21 +901,21 @@ class _CareerBack extends StatelessWidget {
                 : 'Maksimal daraja',
             style: const TextStyle(color: AppColors.faint, fontSize: 11),
           ),
-          const SizedBox(height: 16),
+          const Spacer(),
           Row(
             children: [
               _CareerStat(
-                label: 'O‘yin',
+                label: 'O‘yinlar',
                 value: '${user.gamesPlayed}',
                 color: Colors.white,
               ),
               _CareerStat(
-                label: 'Gol',
+                label: 'Gollar',
                 value: '${user.goals}',
                 color: const Color(0xFFE8B923),
               ),
               _CareerStat(
-                label: 'Assist',
+                label: 'Uzatmalar',
                 value: '${user.assists}',
                 color: const Color(0xFF3B82F6),
               ),
@@ -1040,10 +945,8 @@ class _CareerBack extends StatelessWidget {
                 color: const Color(0xFFE8B923),
               ),
               _CareerStat(
-                label: 'Poz',
-                value: (user.position ?? 'CM').length > 3
-                    ? (user.position ?? 'CM').substring(0, 3)
-                    : (user.position ?? 'CM'),
+                label: 'Pozitsiya',
+                value: _positionCode(user.position),
                 color: Colors.white70,
               ),
             ],
@@ -1119,33 +1022,25 @@ class _MyPositionSection extends StatelessWidget {
   const _MyPositionSection({required this.user});
   final User user;
 
-  String get _pos {
-    final p = (user.position ?? 'CM').toUpperCase();
-    if (p.length <= 3) return p;
-    if (p.contains('DARVOZA') || p.contains('GK')) return 'GK';
-    if (p.contains('HIMOY')) return 'CB';
-    if (p.contains('YARIM')) return 'CM';
-    if (p.contains('HUJUM')) return 'ST';
-    return 'CM';
-  }
-
   @override
   Widget build(BuildContext context) {
+    final code = _positionCode(user.position);
+    final label = PlayerCard.positionLabelUz(user.position);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          '⚽ MY POSITION',
+          '⚽ Mening pozitsiyam',
           style: TextStyle(
             fontWeight: FontWeight.w900,
             fontSize: 13,
-            letterSpacing: 1.4,
+            letterSpacing: 1.0,
             color: AppColors.lime,
           ),
         ),
         const SizedBox(height: 4),
         Text(
-          'Primary position · $_pos',
+          '$code · $label',
           style: const TextStyle(color: AppColors.muted, fontSize: 12),
         ),
         const SizedBox(height: 10),
@@ -1159,98 +1054,184 @@ class _MyPositionSection extends StatelessWidget {
   }
 }
 
-class _Achievements extends StatelessWidget {
+class _Achievements extends ConsumerWidget {
   const _Achievements({required this.user});
   final User user;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final teamsAsync = ref.watch(myTeamsProvider);
+    final teams = teamsAsync.maybeWhen(
+      data: (page) => page.items,
+      orElse: () => const <Team>[],
+    );
+    final isCaptain = teams.any((t) => t.captainId == user.id);
+
     final items = [
-      _Ach('Ilk o‘yin', '1 o‘yin', Icons.flash_on, user.gamesPlayed >= 1),
-      _Ach('Gol mashinasi', '${user.goals} gol', Icons.sports_soccer,
-          user.goals >= 5),
-      _Ach('Assistchi', '${user.assists} assist', Icons.handshake_outlined,
-          user.assists >= 5),
-      _Ach('Premium', user.isPremium ? 'Faol' : 'Yopiq', Icons.workspace_premium,
-          user.isPremium),
+      _Ach(
+        'Premium kubogi',
+        user.isPremium ? 'Ochilgan' : 'Yopiq',
+        Icons.workspace_premium,
+        user.isPremium,
+        AppColors.gold,
+      ),
+      _Ach(
+        'Faol o‘yinchi',
+        user.gamesPlayed >= 3 ? '${user.gamesPlayed} o‘yin' : '3+ o‘yin',
+        Icons.sports_soccer,
+        user.gamesPlayed >= 3,
+        AppColors.lime,
+      ),
+      if (isCaptain)
+        const _Ach(
+          'Sardorlik',
+          'Jamoa sardori',
+          Icons.star,
+          true,
+          AppColors.gold,
+        ),
+      const _Ach(
+        'Turnir ishtiroki',
+        'Tez orada',
+        Icons.emoji_events_outlined,
+        false,
+        AppColors.muted,
+      ),
     ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          '🏆 ACHIEVEMENTS',
+          '🏆 Kuboklar',
           style: TextStyle(
             fontWeight: FontWeight.w900,
             fontSize: 13,
-            letterSpacing: 1.4,
+            letterSpacing: 1.0,
             color: AppColors.gold,
           ),
         ),
-        const SizedBox(height: 10),
-        Row(
-          children: items
-              .map(
-                (a) => Expanded(
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 3),
-                    padding: const EdgeInsets.symmetric(
-                        vertical: 14, horizontal: 6),
-                    decoration: BoxDecoration(
-                      color: a.got
-                          ? AppColors.lime.withValues(alpha: 0.1)
-                          : const Color(0xFF0A120D),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: a.got
-                            ? AppColors.lime.withValues(alpha: 0.55)
-                            : AppColors.edge.withValues(alpha: 0.6),
-                      ),
-                      boxShadow: a.got
-                          ? [
-                              BoxShadow(
-                                color: AppColors.lime.withValues(alpha: 0.18),
-                                blurRadius: 12,
+        const SizedBox(height: 12),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(10, 18, 10, 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            gradient: const LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFF1A1510), Color(0xFF0C100D)],
+            ),
+            border: Border.all(color: AppColors.gold.withValues(alpha: 0.22)),
+          ),
+          child: Column(
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  for (final a in items.take(4))
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Opacity(
+                          opacity: a.got ? 1 : 0.42,
+                          child: Column(
+                            children: [
+                              Container(
+                                width: 48,
+                                height: 56,
+                                decoration: BoxDecoration(
+                                  borderRadius: const BorderRadius.vertical(
+                                    top: Radius.circular(8),
+                                    bottom: Radius.circular(4),
+                                  ),
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: a.got
+                                        ? [
+                                            a.color.withValues(alpha: 0.95),
+                                            a.color.withValues(alpha: 0.35),
+                                          ]
+                                        : [
+                                            Colors.white24,
+                                            Colors.white10,
+                                          ],
+                                  ),
+                                  boxShadow: a.got
+                                      ? [
+                                          BoxShadow(
+                                            color:
+                                                a.color.withValues(alpha: 0.35),
+                                            blurRadius: 12,
+                                            offset: const Offset(0, 4),
+                                          ),
+                                        ]
+                                      : null,
+                                ),
+                                child: Icon(
+                                  a.got ? a.icon : Icons.lock_outline,
+                                  color: a.got
+                                      ? const Color(0xFF1A1000)
+                                      : AppColors.faint,
+                                  size: 24,
+                                ),
                               ),
-                            ]
-                          : null,
-                    ),
-                    child: Opacity(
-                      opacity: a.got ? 1 : 0.45,
-                      child: Column(
-                        children: [
-                          Icon(
-                            a.got ? a.icon : Icons.lock_outline,
-                            size: 22,
-                            color: a.got ? AppColors.lime : AppColors.faint,
+                              const SizedBox(height: 6),
+                              Text(
+                                a.label,
+                                textAlign: TextAlign.center,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  color:
+                                      a.got ? AppColors.ink : AppColors.faint,
+                                ),
+                              ),
+                              Text(
+                                a.sub,
+                                textAlign: TextAlign.center,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  color: a.got
+                                      ? AppColors.muted
+                                      : AppColors.faint,
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 6),
-                          Text(
-                            a.label,
-                            textAlign: TextAlign.center,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                              color: a.got ? AppColors.ink : AppColors.faint,
-                            ),
-                          ),
-                          Text(
-                            a.sub,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 9,
-                              color: a.got ? AppColors.muted : AppColors.faint,
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
                     ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Container(
+                height: 10,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(3),
+                  gradient: LinearGradient(
+                    colors: [
+                      const Color(0xFF6B4E2E).withValues(alpha: 0.9),
+                      const Color(0xFF3D2A16),
+                      const Color(0xFF6B4E2E).withValues(alpha: 0.9),
+                    ],
                   ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.35),
+                      blurRadius: 6,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
                 ),
-              )
-              .toList(),
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -1258,11 +1239,12 @@ class _Achievements extends StatelessWidget {
 }
 
 class _Ach {
-  const _Ach(this.label, this.sub, this.icon, this.got);
+  const _Ach(this.label, this.sub, this.icon, this.got, [this.color = AppColors.lime]);
   final String label;
   final String sub;
   final IconData icon;
   final bool got;
+  final Color color;
 }
 
 class _ReferralCard extends StatelessWidget {
@@ -1310,21 +1292,14 @@ class _ReferralCard extends StatelessWidget {
 }
 
 class _SectionTitle extends StatelessWidget {
-  const _SectionTitle({required this.title, this.action});
+  const _SectionTitle({required this.title});
   final String title;
-  final Widget? action;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Text(
-          title,
-          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
-        ),
-        const Spacer(),
-        if (action != null) action!,
-      ],
+    return Text(
+      title,
+      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
     );
   }
 }
@@ -1371,10 +1346,10 @@ class _QuickGrid extends StatelessWidget {
       physics: const NeverScrollableScrollPhysics(),
       itemCount: items.length,
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 4,
+        crossAxisCount: 3,
         mainAxisSpacing: 10,
         crossAxisSpacing: 10,
-        childAspectRatio: 0.92,
+        childAspectRatio: 0.95,
       ),
       itemBuilder: (context, i) {
         final item = items[i];
@@ -1430,13 +1405,11 @@ class _MenuTile extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.onTap,
-    this.subtitle,
     this.trailing,
   });
 
   final IconData icon;
   final String title;
-  final String? subtitle;
   final Widget? trailing;
   final VoidCallback onTap;
 
@@ -1445,9 +1418,6 @@ class _MenuTile extends StatelessWidget {
     return ListTile(
       leading: Icon(icon, color: AppColors.primary),
       title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-      subtitle: subtitle != null
-          ? Text(subtitle!, style: const TextStyle(fontSize: 12))
-          : null,
       trailing: trailing ?? const Icon(Icons.chevron_right),
       onTap: onTap,
     );
@@ -1673,7 +1643,12 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
               initialValue: _positions.contains(_position) ? _position : null,
               decoration: const InputDecoration(labelText: 'Pozitsiya'),
               items: _positions
-                  .map((p) => DropdownMenuItem(value: p, child: Text(p)))
+                  .map(
+                    (p) => DropdownMenuItem(
+                      value: p,
+                      child: Text('$p · ${PlayerCard.positionLabelUz(p)}'),
+                    ),
+                  )
                   .toList(),
               onChanged: (v) => setState(() => _position = v),
             ),
