@@ -447,8 +447,8 @@ class ApiClient {
         parse: (d) => Booking.fromJson(Map<String, dynamic>.from(d as Map)),
       );
 
-  /// To‘lov cheki (rasm) — egaga yetadi.
-  Future<String> uploadBookingPaymentProof({
+  /// To‘lov cheki (rasm) — egaga yetadi + TekshirPul natijasi.
+  Future<Map<String, dynamic>> uploadBookingPaymentProof({
     required int bookingId,
     required String filePath,
     String fileName = 'payment_proof.jpg',
@@ -466,8 +466,7 @@ class ApiClient {
           receiveTimeout: const Duration(minutes: 1),
         ),
       );
-      final map = Map<String, dynamic>.from(res.data as Map);
-      return map['payment_proof_url']?.toString() ?? '';
+      return Map<String, dynamic>.from(res.data as Map);
     } on DioException catch (e) {
       _throwDio(e);
     }

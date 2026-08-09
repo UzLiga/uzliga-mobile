@@ -6,11 +6,9 @@ import '../../core/api/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/format.dart';
 import '../../shared/models/models.dart';
+import '../../shared/widgets/pitch_atmosphere.dart';
 import '../../shared/widgets/widgets.dart';
 import '../auth/auth_provider.dart';
-import '../shell/football_nav/football_nav_controller.dart';
-import '../shell/shell_screen.dart';
-
 final homeStadiumsProvider = FutureProvider((ref) {
   return ref.watch(apiClientProvider).listStadiums(limit: 8, sort: '-rating');
 });
@@ -35,74 +33,66 @@ class HomeScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: RefreshIndicator(
-        color: AppColors.primary,
-        onRefresh: () async {
-          ref.invalidate(homeStadiumsProvider);
-          ref.invalidate(homeGamesProvider);
-        },
-        child: CustomScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          slivers: [
-            SliverToBoxAdapter(
-              child: _HomeHero(
-                name: name,
-                heroImageUrl: heroUrl,
-                onWallet: () => context.push('/app/wallet'),
-                onNotif: () => context.push('/app/notifications'),
-                onBook: () => context.push('/app/stadiums'),
-                onPlay: () => context.go('/app/games'),
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
-                child: Row(
-                  children: [
-                    _NavChip(
-                      icon: Icons.sports_soccer,
-                      label: 'O‘yinlar',
-                      onTap: () {
-                        final shell = ref.read(shellTabIndexProvider);
-                        ref.read(footballNavProvider.notifier).runTo(
-                              from: shell,
-                              to: 1,
-                              reduceMotion:
-                                  MediaQuery.disableAnimationsOf(context),
-                              go: () => context.go('/app/games'),
-                            );
-                      },
-                    ),
-                    _NavChip(
-                      icon: Icons.groups_outlined,
-                      label: 'Jamoalar',
-                      onTap: () => context.push('/app/teams'),
-                    ),
-                    _NavChip(
-                      icon: Icons.emoji_events_outlined,
-                      label: 'Turnir',
-                      onTap: () => context.push('/app/tournaments'),
-                    ),
-                    _NavChip(
-                      icon: Icons.handshake_outlined,
-                      label: 'Sherik',
-                      onTap: () => context.push('/app/free-agents'),
-                    ),
-                  ],
+      body: PitchAtmosphere(
+        child: RefreshIndicator(
+          color: AppColors.primary,
+          onRefresh: () async {
+            ref.invalidate(homeStadiumsProvider);
+            ref.invalidate(homeGamesProvider);
+          },
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverToBoxAdapter(
+                child: _HomeHero(
+                  name: name,
+                  heroImageUrl: heroUrl,
+                  onWallet: () => context.push('/app/wallet'),
+                  onNotif: () => context.push('/app/notifications'),
+                  onBook: () => context.push('/app/stadiums'),
+                  onPlay: () => context.go('/app/games'),
                 ),
               ),
-            ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 22, 16, 0),
-                child: SectionHeader(
-                  title: 'Yaqin maydonlar',
-                  actionLabel: 'Hammasi',
-                  onAction: () => context.push('/app/stadiums'),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
+                  child: Row(
+                    children: [
+                      _NavChip(
+                        icon: Icons.sports_soccer,
+                        label: 'O‘yinlar',
+                        onTap: () => context.go('/app/games'),
+                      ),
+                      _NavChip(
+                        icon: Icons.groups_outlined,
+                        label: 'Jamoalar',
+                        onTap: () => context.push('/app/teams'),
+                      ),
+                      _NavChip(
+                        icon: Icons.emoji_events_outlined,
+                        label: 'Turnir',
+                        onTap: () => context.push('/app/tournaments'),
+                      ),
+                      _NavChip(
+                        icon: Icons.handshake_outlined,
+                        label: 'Sherik',
+                        onTap: () => context.push('/app/free-agents'),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            stadiums.when(
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 22, 16, 0),
+                  child: SectionHeader(
+                    title: 'Yaqin maydonlar',
+                    actionLabel: 'Hammasi',
+                    onAction: () => context.push('/app/stadiums'),
+                  ),
+                ),
+              ),
+              stadiums.when(
               skipLoadingOnReload: true,
               skipLoadingOnRefresh: true,
               loading: () => const SliverToBoxAdapter(
@@ -191,8 +181,9 @@ class HomeScreen extends ConsumerWidget {
                 );
               },
             ),
-            const SliverToBoxAdapter(child: SizedBox(height: 32)),
-          ],
+              const SliverToBoxAdapter(child: SizedBox(height: 32)),
+            ],
+          ),
         ),
       ),
     );
@@ -314,6 +305,7 @@ class _HomeHeroState extends State<_HomeHero>
                 const Spacer(),
                 IconButton(
                   onPressed: widget.onWallet,
+                  tooltip: 'To‘pcha',
                   icon: const Icon(Icons.account_balance_wallet_outlined),
                   color: Colors.white70,
                 ),

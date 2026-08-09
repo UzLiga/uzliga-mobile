@@ -84,14 +84,14 @@ class _FootballPlayerState extends State<FootballPlayer>
         final breath = reduce ? 0.0 : math.sin(_idle.value * math.pi) * 0.018;
         final kickMix =
             kicking ? Curves.easeOutCubic.transform(_kickFlash.value) : 0.0;
-        // Oyoq oldinga — engil lean + translate
+        // Oyoq oldinga — engil, haddan tashqari 3D yo‘q
         final yaw = kicking
-            ? -0.06 - kickMix * 0.08
+            ? -0.04 - kickMix * 0.05
             : receiving
-                ? 0.05
-                : breath * 0.8;
-        final pitch = kicking ? 0.02 + kickMix * 0.03 : -breath * 0.35;
-        final leanX = kicking ? -10.0 - kickMix * 14.0 : breath * -2.0;
+                ? 0.03
+                : breath * 0.35;
+        final pitch = kicking ? 0.01 : -breath * 0.15;
+        final leanX = kicking ? -6.0 - kickMix * 8.0 : breath * -1.5;
 
         // To‘p oyog‘i oldida — kickda biroz oldinga “tegish”
         final ballLeft = w * (receiving

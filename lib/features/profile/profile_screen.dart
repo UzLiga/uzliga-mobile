@@ -16,6 +16,7 @@ import '../../core/widgets/pc_app_bar.dart';
 import '../../shared/format.dart';
 import '../../shared/models/models.dart';
 import '../../shared/widgets/booking_ticket.dart';
+import '../../shared/widgets/pitch_atmosphere.dart';
 import '../../shared/widgets/player_card.dart';
 import '../../shared/widgets/widgets.dart';
 import '../auth/auth_provider.dart';
@@ -46,10 +47,11 @@ class ProfileScreen extends ConsumerWidget {
             MediaQuery.platformBrightnessOf(context) == Brightness.dark);
 
     return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: user == null
-          ? const LoadingView()
-          : RefreshIndicator(
+      backgroundColor: AppColors.bg,
+      body: PitchAtmosphere(
+        child: user == null
+            ? const LoadingView()
+            : RefreshIndicator(
               color: AppColors.primary,
               onRefresh: () async {
                 await ref.read(authProvider.notifier).refreshMe();
@@ -63,6 +65,11 @@ class ProfileScreen extends ConsumerWidget {
                     pinned: true,
                     title: const Text('Profil'),
                     actions: [
+                      IconButton(
+                        tooltip: 'Profilni tahrirlash',
+                        onPressed: () => _openEdit(context, ref, user),
+                        icon: const Icon(Icons.edit_outlined),
+                      ),
                       IconButton(
                         tooltip: isDark ? 'Yorug‘ rejim' : 'Qorong‘u rejim',
                         onPressed: () =>
@@ -152,7 +159,7 @@ class ProfileScreen extends ConsumerWidget {
                             ),
                             _QuickItem(
                               icon: Icons.account_balance_wallet_outlined,
-                              label: 'Hamyonim',
+                              label: 'To‘pcha',
                               onTap: () => context.push('/app/wallet'),
                             ),
                             _QuickItem(
@@ -277,6 +284,7 @@ class ProfileScreen extends ConsumerWidget {
                 ],
               ),
             ),
+      ),
     );
   }
 
@@ -322,38 +330,8 @@ class _HeroHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final premium = user.isPremium;
     final ring = premium ? AppColors.gold : AppColors.lime;
-    final frame = premium
-        ? AppColors.gold.withValues(alpha: 0.75)
-        : AppColors.lime.withValues(alpha: 0.2);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(18, 22, 18, 20),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        gradient: RadialGradient(
-          center: const Alignment(0, -0.55),
-          radius: 1.15,
-          colors: premium
-              ? const [
-                  Color(0xFF3A2A0C),
-                  Color(0xFF1A1408),
-                  Color(0xFF0A0905),
-                ]
-              : const [
-                  Color(0xFF163528),
-                  Color(0xFF07110B),
-                  Color(0xFF050807),
-                ],
-        ),
-        border: Border.all(color: frame, width: premium ? 2 : 1),
-        boxShadow: [
-          BoxShadow(
-            color: ring.withValues(alpha: premium ? 0.28 : 0.08),
-            blurRadius: premium ? 32 : 28,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 8, 4, 4),
       child: Column(
         children: [
           Text(
@@ -540,53 +518,35 @@ class _PremiumFifaSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (!user.isPremium) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(22),
-          gradient: const LinearGradient(
-            colors: [Color(0xFF2A2110), Color(0xFF0B1510)],
-          ),
-          border: Border.all(
-            color: const Color(0xFFE8B923).withValues(alpha: 0.65),
-            width: 1.5,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Row(
-              children: [
-                Icon(Icons.workspace_premium, color: Color(0xFFE8B923)),
-                SizedBox(width: 8),
-                Text(
-                  'Premium · FIFA karta',
-                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            const Text(
-              'FIFA karta va karyera (flip) — faqat Premium da.\n'
-              'O‘yin · gol · uzatma · sariq/qizil · reyting orqa tomonda.',
-              style: TextStyle(color: AppColors.muted, fontSize: 13),
-            ),
-            const SizedBox(height: 14),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () => context.push('/app/premium'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.gold,
-                  foregroundColor: const Color(0xFF1A1000),
-                ),
-                icon: const Icon(Icons.lock_open),
-                label: const Text('Premium ochish'),
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.workspace_premium, color: AppColors.primarySoft),
+              SizedBox(width: 8),
+              Text(
+                'Premium · FIFA karta',
+                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
               ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'FIFA karta va karyera (flip) — faqat Premium da.\n'
+            'Profil rasmi karta orqa fonida. O‘yin · gol · uzatma · reyting.',
+            style: TextStyle(color: AppColors.muted, fontSize: 13, height: 1.35),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: () => context.push('/app/premium'),
+              icon: const Icon(Icons.lock_open),
+              label: const Text('Premium ochish'),
             ),
-          ],
-        ),
+          ),
+        ],
       );
     }
     return _FifaFlipCard(user: user);
@@ -1112,126 +1072,65 @@ class _Achievements extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 12),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(10, 18, 10, 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            gradient: const LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Color(0xFF1A1510), Color(0xFF0C100D)],
-            ),
-            border: Border.all(color: AppColors.gold.withValues(alpha: 0.22)),
-          ),
-          child: Column(
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  for (final a in items.take(4))
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: Opacity(
-                          opacity: a.got ? 1 : 0.42,
-                          child: Column(
-                            children: [
-                              Container(
-                                width: 48,
-                                height: 56,
-                                decoration: BoxDecoration(
-                                  borderRadius: const BorderRadius.vertical(
-                                    top: Radius.circular(8),
-                                    bottom: Radius.circular(4),
-                                  ),
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topCenter,
-                                    end: Alignment.bottomCenter,
-                                    colors: a.got
-                                        ? [
-                                            a.color.withValues(alpha: 0.95),
-                                            a.color.withValues(alpha: 0.35),
-                                          ]
-                                        : [
-                                            Colors.white24,
-                                            Colors.white10,
-                                          ],
-                                  ),
-                                  boxShadow: a.got
-                                      ? [
-                                          BoxShadow(
-                                            color:
-                                                a.color.withValues(alpha: 0.35),
-                                            blurRadius: 12,
-                                            offset: const Offset(0, 4),
-                                          ),
-                                        ]
-                                      : null,
-                                ),
-                                child: Icon(
-                                  a.got ? a.icon : Icons.lock_outline,
-                                  color: a.got
-                                      ? const Color(0xFF1A1000)
-                                      : AppColors.faint,
-                                  size: 24,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                a.label,
-                                textAlign: TextAlign.center,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w800,
-                                  color:
-                                      a.got ? AppColors.ink : AppColors.faint,
-                                ),
-                              ),
-                              Text(
-                                a.sub,
-                                textAlign: TextAlign.center,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  color: a.got
-                                      ? AppColors.muted
-                                      : AppColors.faint,
-                                ),
-                              ),
-                            ],
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            for (final a in items.take(4))
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Opacity(
+                    opacity: a.got ? 1 : 0.42,
+                    child: Column(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: a.got
+                                ? a.color.withValues(alpha: 0.22)
+                                : AppColors.surface2,
+                            border: Border.all(
+                              color: a.got
+                                  ? a.color.withValues(alpha: 0.55)
+                                  : AppColors.edge,
+                            ),
+                          ),
+                          child: Icon(
+                            a.got ? a.icon : Icons.lock_outline,
+                            color: a.got ? a.color : AppColors.faint,
+                            size: 22,
                           ),
                         ),
-                      ),
+                        const SizedBox(height: 6),
+                        Text(
+                          a.label,
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: a.got ? AppColors.ink : AppColors.faint,
+                          ),
+                        ),
+                        Text(
+                          a.sub,
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 9,
+                            color: a.got ? AppColors.muted : AppColors.faint,
+                          ),
+                        ),
+                      ],
                     ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Container(
-                height: 10,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(3),
-                  gradient: LinearGradient(
-                    colors: [
-                      const Color(0xFF6B4E2E).withValues(alpha: 0.9),
-                      const Color(0xFF3D2A16),
-                      const Color(0xFF6B4E2E).withValues(alpha: 0.9),
-                    ],
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.35),
-                      blurRadius: 6,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
                 ),
               ),
-            ],
-          ),
+          ],
         ),
       ],
     );
@@ -1253,40 +1152,32 @@ class _ReferralCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.edge),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.card_giftcard, color: AppColors.primary),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Referral kod',
-                  style: TextStyle(fontWeight: FontWeight.w700),
-                ),
-                Text(code, style: const TextStyle(color: AppColors.muted)),
-              ],
-            ),
+    return Row(
+      children: [
+        const Icon(Icons.card_giftcard, color: AppColors.primary),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Referral kod',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              Text(code, style: const TextStyle(color: AppColors.muted)),
+            ],
           ),
-          IconButton(
-            onPressed: () {
-              Clipboard.setData(ClipboardData(text: code));
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Kod nusxalandi')),
-              );
-            },
-            icon: const Icon(Icons.copy, size: 20),
-          ),
-        ],
-      ),
+        ),
+        IconButton(
+          onPressed: () {
+            Clipboard.setData(ClipboardData(text: code));
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Kod nusxalandi')),
+            );
+          },
+          icon: const Icon(Icons.copy, size: 20),
+        ),
+      ],
     );
   }
 }
@@ -1310,16 +1201,15 @@ class _MenuCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        children: [
-          for (var i = 0; i < children.length; i++) ...[
-            if (i > 0) const Divider(height: 1),
-            children[i],
-          ],
+    // Kam "quti" — faqat yumshoq divider
+    return Column(
+      children: [
+        for (var i = 0; i < children.length; i++) ...[
+          if (i > 0)
+            Divider(height: 1, color: AppColors.edge.withValues(alpha: 0.6)),
+          children[i],
         ],
-      ),
+      ],
     );
   }
 }
@@ -1353,45 +1243,38 @@ class _QuickGrid extends StatelessWidget {
       ),
       itemBuilder: (context, i) {
         final item = items[i];
-        return Material(
-          color: Theme.of(context).cardTheme.color ?? AppColors.surface,
-          borderRadius: BorderRadius.circular(16),
-          child: InkWell(
-            onTap: item.onTap,
-            borderRadius: BorderRadius.circular(16),
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: Theme.of(context).dividerColor,
+        return InkWell(
+          onTap: item.onTap,
+          borderRadius: BorderRadius.circular(18),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.glassGreen,
+                    border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.35),
+                    ),
+                  ),
+                  child: Icon(item.icon, color: AppColors.primarySoft, size: 22),
                 ),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.14),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(item.icon, color: AppColors.primary, size: 20),
+                const SizedBox(height: 8),
+                Text(
+                  item.label,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    item.label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         );
@@ -1577,8 +1460,8 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
             ),
             const SizedBox(height: 6),
             const Text(
-              'Ism, rasm, pozitsiya, jismoniy ma’lumot — FIFA attrs o‘yinlardan.',
-              style: TextStyle(color: AppColors.muted, fontSize: 12),
+              'Rasm FIFA karta orqa fonida ham chiqadi. Pozitsiya va jismoniy ma’lumotni shu yerdan yangilang.',
+              style: TextStyle(color: AppColors.muted, fontSize: 12, height: 1.35),
             ),
             const SizedBox(height: 16),
             Center(
@@ -1588,8 +1471,8 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
                   children: [
                     ClipOval(
                       child: SizedBox(
-                        width: 88,
-                        height: 88,
+                        width: 96,
+                        height: 96,
                         child: _localAvatarPath != null
                             ? Image.file(
                                 File(_localAvatarPath!),
@@ -1598,7 +1481,7 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
                             : (avatar != null && avatar.isNotEmpty
                                 ? PcNetworkImage(
                                     url: avatar,
-                                    memCacheWidth: 176,
+                                    memCacheWidth: 192,
                                   )
                                 : Container(
                                     color: AppColors.surface2,
@@ -1611,7 +1494,7 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
                       right: 0,
                       bottom: 0,
                       child: Container(
-                        padding: const EdgeInsets.all(6),
+                        padding: const EdgeInsets.all(7),
                         decoration: const BoxDecoration(
                           color: AppColors.primary,
                           shape: BoxShape.circle,
@@ -1626,14 +1509,20 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
                                 ),
                               )
                             : const Icon(Icons.camera_alt,
-                                size: 14, color: Color(0xFF052E12)),
+                                size: 15, color: Color(0xFF052E12)),
                       ),
                     ),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: _uploadingAvatar ? null : _pickAvatar,
+              icon: const Icon(Icons.photo_camera_outlined, size: 18),
+              label: const Text('FIFA / profil rasmini yuklash'),
+            ),
+            const SizedBox(height: 12),
             TextField(
               controller: _name,
               decoration: const InputDecoration(labelText: 'To‘liq ism'),
@@ -1725,6 +1614,20 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
 class BookingsScreen extends ConsumerWidget {
   const BookingsScreen({super.key});
 
+  String _statusLabel(Booking b) {
+    if (b.isCancelled) return 'Bekor';
+    if (b.isConfirmed) return 'Tasdiqlangan';
+    if (b.isPending) return 'Chek kutilyapti';
+    return b.status;
+  }
+
+  Color _statusColor(Booking b) {
+    if (b.isCancelled) return const Color(0xFFE11D48);
+    if (b.isConfirmed) return AppColors.primary;
+    if (b.isPending) return const Color(0xFFF59E0B);
+    return AppColors.muted;
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(myBookingsProvider);
@@ -1755,127 +1658,243 @@ class BookingsScreen extends ConsumerWidget {
             color: AppColors.primary,
             onRefresh: () async => ref.invalidate(myBookingsProvider),
             child: ListView.separated(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
               itemCount: page.items.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 14),
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
               itemBuilder: (context, i) {
                 final b = page.items[i];
                 final deposit = b.stadium.depositFor(b.totalPrice);
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    BookingTicket.fromBooking(b, compact: true),
-                    if (b.stadium.payoutCardMasked != null) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        'Egasi kartasi ${b.stadium.payoutCardMasked}',
-                        style: const TextStyle(
-                          color: AppColors.muted,
-                          fontSize: 11,
-                        ),
-                      ),
-                    ],
-                    if (b.isConfirmed || b.isPending) ...[
-                      const SizedBox(height: 10),
-                      if (b.isConfirmed)
-                        ElevatedButton.icon(
-                          onPressed: () async {
-                            try {
-                              final qr = await ref
-                                  .read(apiClientProvider)
-                                  .bookingQr(b.id);
-                              if (!context.mounted) return;
-                              await showBookingTicketSheet(
-                                context,
-                                title: 'Kirish ticketi',
-                                actionLabel: 'Yopish',
-                                ticket: BookingTicket.fromBooking(b,
-                                    qrPayload: qr),
-                              );
-                            } catch (e) {
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('$e')),
-                                );
-                              }
-                            }
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.gold,
-                            foregroundColor: const Color(0xFF1A1000),
-                          ),
-                          icon: const Icon(Icons.qr_code_2, size: 18),
-                          label: const Text('QR ticket'),
-                        ),
-                      if (b.isPending) ...[
-                        const SizedBox(height: 8),
-                        ElevatedButton(
-                          onPressed: () async {
-                            try {
-                              await ref
-                                  .read(apiClientProvider)
-                                  .payBooking(b.id);
-                              ref.invalidate(myBookingsProvider);
-                            } catch (e) {
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('$e')),
-                                );
-                              }
-                            }
-                          },
-                          child: Text('Zakalat · ${formatPrice(deposit)}'),
-                        ),
-                      ],
-                      const SizedBox(height: 8),
-                      OutlinedButton(
-                        onPressed: () async {
-                          final ok = await showDialog<bool>(
-                            context: context,
-                            builder: (ctx) => AlertDialog(
-                              backgroundColor: AppColors.surface,
-                              title: const Text('Bronni bekor qilish?'),
-                              content: const Text(
-                                'Qoidalar:\n'
-                                '• ≥24 soat oldin — 100% qaytarish\n'
-                                '• 2–24 soat — 50%\n'
-                                '• <2 soat — qaytarish yo‘q',
+                final color = _statusColor(b);
+                return Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: AppColors.edge),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: 48,
+                              height: 48,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: color.withValues(alpha: 0.14),
+                                borderRadius: BorderRadius.circular(14),
                               ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.pop(ctx, false),
-                                  child: const Text('Yo‘q'),
-                                ),
-                                TextButton(
-                                  onPressed: () => Navigator.pop(ctx, true),
-                                  child: const Text('Bekor qilish'),
-                                ),
-                              ],
+                              child: Icon(Icons.stadium_rounded,
+                                  color: color, size: 24),
                             ),
-                          );
-                          if (ok != true) return;
-                          try {
-                            final res = await ref
-                                .read(apiClientProvider)
-                                .cancelBookingDetailed(b.id);
-                            ref.invalidate(myBookingsProvider);
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text(res.message)),
-                              );
-                            }
-                          } catch (e) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('$e')),
-                              );
-                            }
-                          }
-                        },
-                        child: const Text('Bekor qilish'),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    b.stadium.name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${b.date} · ${b.startTime} · ${b.durationHours} soat',
+                                    style: const TextStyle(
+                                      color: AppColors.muted,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: color.withValues(alpha: 0.14),
+                                borderRadius: BorderRadius.circular(99),
+                              ),
+                              child: Text(
+                                _statusLabel(b),
+                                style: TextStyle(
+                                  color: color,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+                        child: Row(
+                          children: [
+                            Text(
+                              formatPrice(b.totalPrice),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 18,
+                              ),
+                            ),
+                            const Spacer(),
+                            Text(
+                              'BRON-${b.id}',
+                              style: const TextStyle(
+                                color: AppColors.faint,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (b.isConfirmed || b.isPending)
+                        Container(
+                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                          child: Row(
+                            children: [
+                              if (b.isConfirmed)
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    onPressed: () async {
+                                      try {
+                                        final qr = await ref
+                                            .read(apiClientProvider)
+                                            .bookingQr(b.id);
+                                        if (!context.mounted) return;
+                                        await showBookingTicketSheet(
+                                          context,
+                                          title: 'Kirish ticketi',
+                                          actionLabel: 'Yopish',
+                                          ticket: BookingTicket.fromBooking(b,
+                                              qrPayload: qr),
+                                        );
+                                      } catch (e) {
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            SnackBar(content: Text('$e')),
+                                          );
+                                        }
+                                      }
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.gold,
+                                      foregroundColor: const Color(0xFF1A1000),
+                                      elevation: 0,
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 12),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                    icon: const Icon(Icons.qr_code_2, size: 18),
+                                    label: const Text(
+                                      'QR',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.w900),
+                                    ),
+                                  ),
+                                ),
+                              if (b.isPending)
+                                Expanded(
+                                  child: ElevatedButton(
+                                    onPressed: () =>
+                                        context.push('/app/stadiums/${b.stadium.id}'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.primary,
+                                      foregroundColor: const Color(0xFF06210C),
+                                      elevation: 0,
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 12),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      'Zakalat ${formatPrice(deposit)}',
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.w900),
+                                    ),
+                                  ),
+                                ),
+                              const SizedBox(width: 8),
+                              OutlinedButton(
+                                onPressed: () async {
+                                  final ok = await showDialog<bool>(
+                                    context: context,
+                                    builder: (ctx) => AlertDialog(
+                                      backgroundColor: AppColors.surface,
+                                      title:
+                                          const Text('Bronni bekor qilish?'),
+                                      content: const Text(
+                                        'Qoidalar:\n'
+                                        '• ≥24 soat — 100% qaytarish\n'
+                                        '• 2–24 soat — 50%\n'
+                                        '• <2 soat — qaytarish yo‘q',
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.pop(ctx, false),
+                                          child: const Text('Yo‘q'),
+                                        ),
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.pop(ctx, true),
+                                          child: const Text('Bekor qilish'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                  if (ok != true) return;
+                                  try {
+                                    final res = await ref
+                                        .read(apiClientProvider)
+                                        .cancelBookingDetailed(b.id);
+                                    ref.invalidate(myBookingsProvider);
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        SnackBar(content: Text(res.message)),
+                                      );
+                                    }
+                                  } catch (e) {
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        SnackBar(content: Text('$e')),
+                                      );
+                                    }
+                                  }
+                                },
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppColors.muted,
+                                  side: const BorderSide(color: AppColors.edge),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 14, vertical: 12),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                child: const Text('Bekor'),
+                              ),
+                            ],
+                          ),
+                        ),
                     ],
-                  ],
+                  ),
                 );
               },
             ),

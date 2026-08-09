@@ -45,6 +45,7 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
   bool _booking = false;
   bool _daytimeOpen = false;
   XFile? _proof;
+  int? _createdBookingId;
 
   Stadium get stadium => widget.stadium;
   String get _dateStr => DateFormat('yyyy-MM-dd').format(_date);
@@ -80,7 +81,7 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
   static const _monthAccents = <Color>[
     Color(0xFF5B8DEF), // yan
     Color(0xFFE879A9), // fev
-    Color(0xFF46ED13), // mar
+    Color(0xFF12B76A), // mar
     Color(0xFFF5A524), // apr
     Color(0xFF22D3A6), // may
     Color(0xFFA78BFA), // iyn
@@ -97,7 +98,7 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
     super.initState();
     final n = DateTime.now();
     _date = DateTime(n.year, n.month, n.day);
-    _dates = List.generate(21, (i) => _date.add(Duration(days: i)));
+    _dates = List.generate(30, (i) => _date.add(Duration(days: i)));
     Future.microtask(_loadSlots);
   }
 
@@ -245,33 +246,103 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
     _snack('Karta raqami nusxalandi');
   }
 
-  Future<void> _pay() async {
+  Future<void> _copyTransferCode() async {
+    final id = _createdBookingId;
+    if (id == null) return;
+    final code = 'BRON-$id';
+    await Clipboard.setData(ClipboardData(text: code));
+    HapticFeedback.lightImpact();
+    _snack('Bron kodi nusxalandi: $code');
+  }
+
+  Future<void> _goToPayStep() async {
     if (_slot == null || _booking) return;
-    if (_proof == null) {
-      _snack('Avval to‘lov chekini yuklang');
-      return;
-    }
-    setState(() => _booking = true);
+    // Avval UI ochiladi — API kutish ekranni “muzlatmasin”
+    setState(() {
+      _step = 1;
+      _booking = true;
+    });
     final api = ref.read(apiClientProvider);
     final start = _norm(_slot!);
-    HapticFeedback.mediumImpact();
-
     try {
+      if (_createdBookingId != null) {
+        try {
+          await api.cancelBooking(_createdBookingId!);
+        } catch (_) {}
+        _createdBookingId = null;
+      }
       final created = await api.createBooking(
         stadiumId: stadium.id,
         date: _dateStr,
         startTime: start,
         durationHours: _duration,
       );
-      await api.uploadBookingPaymentProof(
-        bookingId: created.id,
+      if (!mounted) return;
+      setState(() {
+        _createdBookingId = created.id;
+        _booking = false;
+      });
+    } catch (e) {
+      final msg = '$e';
+      if (msg.contains('slot_taken') ||
+          msg.toLowerCase().contains('band') ||
+          (e is ApiException && e.statusCode == 409)) {
+        _snack('Bu vaqt band — boshqa oralik tanlang');
+        await _loadSlots();
+      } else {
+        _snack(msg);
+      }
+      if (mounted) {
+        setState(() {
+          _step = 0;
+          _booking = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _backFromPay() async {
+    final id = _createdBookingId;
+    if (id != null) {
+      try {
+        await ref.read(apiClientProvider).cancelBooking(id);
+      } catch (_) {}
+      _createdBookingId = null;
+    }
+    setState(() {
+      _step = 0;
+      _proof = null;
+    });
+  }
+
+  Future<void> _pay() async {
+    if (_slot == null || _booking) return;
+    if (_proof == null) {
+      _snack('Avval to‘lov chekini yuklang');
+      return;
+    }
+    final bookingId = _createdBookingId;
+    if (bookingId == null) {
+      _snack('Bron yaratilmadi — orqaga qaytib qayta urining');
+      return;
+    }
+    setState(() => _booking = true);
+    final api = ref.read(apiClientProvider);
+    HapticFeedback.mediumImpact();
+
+    try {
+      final proof = await api.uploadBookingPaymentProof(
+        bookingId: bookingId,
         filePath: _proof!.path,
         fileName: _proof!.name,
       );
       if (!mounted) return;
 
-      final bookingId = created.id;
       final deposit = stadium.depositFor(stadium.pricePerHour * _duration);
+      final auth = proof['payment_proof_authenticity'];
+      final statusLabel =
+          proof['payment_proof_check_status_label']?.toString() ?? '';
+      final disclaimer = proof['disclaimer']?.toString();
 
       Analytics.log('booking_proof_sent', {'id': '$bookingId'});
 
@@ -313,12 +384,35 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
                       fontSize: 20,
                     ),
                   ),
+                  if (auth != null) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      'To‘g‘rilik ehtimoli: $auth%${statusLabel.isNotEmpty ? ' — $statusLabel' : ''}',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 8),
                   Text(
-                    'Zakalat ${formatPrice(deposit)} — stadion egasiga Telegram orqali xabar ketdi. Egasi chekni tasdiqlagach bron ochiladi.',
+                    'Zakalat ${formatPrice(deposit)} — egasi chekni tasdiqlagach bron ochiladi.',
                     textAlign: TextAlign.center,
                     style: const TextStyle(color: AppColors.muted, height: 1.35),
                   ),
+                  if (disclaimer != null && disclaimer.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      disclaimer,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: AppColors.faint,
+                        fontSize: 11,
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 16),
                   SizedBox(
                     width: double.infinity,
@@ -400,7 +494,7 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
                 IconButton(
                   onPressed: () {
                     if (_step > 0) {
-                      setState(() => _step = 0);
+                      _backFromPay();
                     } else {
                       Navigator.pop(context);
                     }
@@ -483,7 +577,7 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
                             return;
                           }
                           HapticFeedback.selectionClick();
-                          setState(() => _step = 1);
+                          _goToPayStep();
                         } else {
                           _pay();
                         }
@@ -611,18 +705,6 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
                           color: sel
                               ? const Color(0xFF0A120E).withValues(alpha: 0.75)
                               : AppColors.muted,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        _monthUz[d.month - 1].substring(0, 3),
-                        style: TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.3,
-                          color: sel
-                              ? const Color(0xFF0A120E).withValues(alpha: 0.55)
-                              : accent,
                         ),
                       ),
                     ],
@@ -861,6 +943,59 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
           ),
         ),
         const SizedBox(height: 14),
+        // Bron kodi — o‘tkazma izohiga
+        if (_createdBookingId != null)
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(bottom: 14),
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.gold, width: 1.2),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'O‘tkazma izohiga yozing',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                    color: AppColors.gold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'BRON-$_createdBookingId',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 22,
+                          letterSpacing: 1.1,
+                        ),
+                      ),
+                    ),
+                    TextButton.icon(
+                      onPressed: _copyTransferCode,
+                      icon: const Icon(Icons.copy_rounded, size: 16),
+                      label: const Text('Nusxa'),
+                    ),
+                  ],
+                ),
+                const Text(
+                  'Shu kodni to‘lov izohiga qo‘ying — egasi va AI tekshiruvi osonlashadi.',
+                  style: TextStyle(
+                    color: AppColors.muted,
+                    fontSize: 12,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
         // Prominent copyable card
         Container(
           width: double.infinity,
@@ -870,12 +1005,13 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
             gradient: const LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [Color(0xFF1E3A2F), Color(0xFF0F1F18)],
+              colors: [AppColors.surface2, AppColors.bg],
             ),
-            border: Border.all(color: const Color(0xFF46ED13), width: 1.4),
+            border: Border.all(
+                color: AppColors.primary.withValues(alpha: 0.55), width: 1.4),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF46ED13).withValues(alpha: 0.12),
+                color: AppColors.primary.withValues(alpha: 0.16),
                 blurRadius: 18,
                 offset: const Offset(0, 8),
               ),
@@ -887,14 +1023,14 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
               const Row(
                 children: [
                   Icon(Icons.credit_card_rounded,
-                      color: Color(0xFF46ED13), size: 18),
+                      color: AppColors.primarySoft, size: 18),
                   SizedBox(width: 8),
                   Text(
                     'Shu kartaga o‘tkazing',
                     style: TextStyle(
                       fontWeight: FontWeight.w800,
                       fontSize: 13,
-                      color: Color(0xFF46ED13),
+                      color: AppColors.primarySoft,
                     ),
                   ),
                 ],
@@ -928,8 +1064,8 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
                   child: ElevatedButton.icon(
                     onPressed: () => _copyCard(rawCard!),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF46ED13),
-                      foregroundColor: const Color(0xFF06210C),
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: const Color(0xFF052E12),
                       elevation: 0,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),

@@ -277,7 +277,13 @@ class _ReelsScreenState extends ConsumerState<ReelsScreen> {
       await ctrl.setLooping(true);
       await ctrl.setVolume(_muted ? 0.0 : 1.0);
       if (!mounted) return;
-      setState(() {});
+      // Joriy slide bo‘lsa darhol play
+      final idx = _clips.indexWhere((c) => c.id == clip.id);
+      if (idx == _index) {
+        await _ensureAudioFocus();
+        await ctrl.play();
+      }
+      if (mounted) setState(() {});
     } catch (_) {
       await ctrl.dispose();
       _pool.remove(clip.id);
@@ -343,6 +349,73 @@ class _ReelsScreenState extends ConsumerState<ReelsScreen> {
     }
   }
 
+  Future<void> _openReelMenu(MatchClip clip) async {
+    final me = ref.read(authProvider).user?.id;
+    final isOwner = me != null && me == clip.userId;
+    HapticFeedback.selectionClick();
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 10),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.edge,
+                borderRadius: BorderRadius.circular(99),
+              ),
+            ),
+            const SizedBox(height: 8),
+            if (isOwner)
+              ListTile(
+                leading: const Icon(Icons.edit_outlined),
+                title: const Text('Mening reels'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  context.push('/app/my-reels');
+                },
+              ),
+            ListTile(
+              leading: const Icon(Icons.person_outline),
+              title: const Text('Profilni ochish'),
+              onTap: () {
+                Navigator.pop(ctx);
+                context.push('/app/users/${clip.userId}');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.flag_outlined),
+              title: const Text('Shikoyat qilish'),
+              onTap: () {
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Shikoyat qabul qilindi')),
+                );
+              },
+            ),
+            ListTile(
+              leading: Icon(_muted ? Icons.volume_up_rounded : Icons.volume_off_rounded),
+              title: Text(_muted ? 'Ovozni yoqish' : 'Ovozni o‘chirish'),
+              onTap: () {
+                Navigator.pop(ctx);
+                setState(() => _muted = !_muted);
+                _applyVolume();
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.listen<int>(shellTabIndexProvider, (prev, next) {
@@ -389,6 +462,10 @@ class _ReelsScreenState extends ConsumerState<ReelsScreen> {
             PageView.builder(
               controller: _pageController,
               scrollDirection: Axis.vertical,
+              allowImplicitScrolling: true,
+              physics: const BouncingScrollPhysics(
+                parent: PageScrollPhysics(),
+              ),
               itemCount: _clips.length,
               onPageChanged: _onPageChanged,
               itemBuilder: (context, index) {
@@ -402,6 +479,7 @@ class _ReelsScreenState extends ConsumerState<ReelsScreen> {
                     _applyVolume();
                   },
                   onOpenProfile: (uid) => context.push('/app/users/$uid'),
+                  onOpenMenu: () => _openReelMenu(clip),
                 );
               },
             ),
@@ -529,6 +607,7 @@ class _ReelSlide extends ConsumerStatefulWidget {
     required this.muted,
     required this.onToggleMute,
     required this.onOpenProfile,
+    required this.onOpenMenu,
     this.controller,
   });
 
@@ -536,6 +615,7 @@ class _ReelSlide extends ConsumerStatefulWidget {
   final bool muted;
   final VoidCallback onToggleMute;
   final void Function(int userId) onOpenProfile;
+  final VoidCallback onOpenMenu;
   final VideoPlayerController? controller;
 
   @override
@@ -824,14 +904,20 @@ class _ReelSlideState extends ConsumerState<_ReelSlide>
                   label: '${clip.commentCount}',
                   onTap: _openComments,
                 ),
-                if (ref.watch(authProvider).user?.id == clip.userId) ...[
-                  const SizedBox(height: 12),
-                  _ActionBtn(
-                    icon: Icons.more_horiz,
-                    label: '···',
-                    onTap: () => context.push('/app/my-reels'),
-                  ),
-                ],
+                const SizedBox(height: 12),
+                _ActionBtn(
+                  icon: widget.muted
+                      ? Icons.volume_off_rounded
+                      : Icons.volume_up_rounded,
+                  label: widget.muted ? 'Off' : 'On',
+                  onTap: widget.onToggleMute,
+                ),
+                const SizedBox(height: 12),
+                _ActionBtn(
+                  icon: Icons.more_horiz,
+                  label: 'Yana',
+                  onTap: widget.onOpenMenu,
+                ),
               ],
             ),
           ),

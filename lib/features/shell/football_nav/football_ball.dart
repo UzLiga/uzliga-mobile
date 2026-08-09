@@ -3,7 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
-/// Photoreal ball — transparent cutout, no green tint.
+/// Toza to‘p — navda tekis (3D burilish yo‘q), glow yashil emas.
 class FootballBall extends StatelessWidget {
   const FootballBall({
     super.key,
@@ -12,6 +12,7 @@ class FootballBall extends StatelessWidget {
     this.selected = false,
     this.rotation = 0,
     this.trail = false,
+    this.flat = false,
   });
 
   final double size;
@@ -19,16 +20,63 @@ class FootballBall extends StatelessWidget {
   final bool selected;
   final double rotation;
   final bool trail;
+  /// Nav icon uchun — perspective yo‘q, yumshoq dumaloq mask.
+  final bool flat;
 
   @override
   Widget build(BuildContext context) {
+    Widget img = Image.asset(
+      'assets/football/ball-real.webp',
+      width: size,
+      height: size,
+      fit: BoxFit.contain,
+      filterQuality: FilterQuality.high,
+      errorBuilder: (_, __, ___) => Image.asset(
+        'assets/football/ball-real.png',
+        width: size,
+        height: size,
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.high,
+      ),
+    );
+
+    if (flat) {
+      img = ClipOval(
+        child: SizedBox(width: size, height: size, child: img),
+      );
+      return SizedBox(
+        width: size,
+        height: size,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            if (selected || glow)
+              Container(
+                width: size * 1.05,
+                height: size * 1.05,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.4),
+                      blurRadius: 8,
+                    ),
+                  ],
+                ),
+              ),
+            img,
+          ],
+        ),
+      );
+    }
+
     final ball = Transform(
       alignment: Alignment.center,
       transform: Matrix4.identity()
-        ..setEntry(3, 2, 0.002)
+        ..setEntry(3, 2, 0.0012)
         ..rotateZ(rotation)
-        ..rotateX(0.55)
-        ..rotateY(-0.25),
+        ..rotateX(0.28)
+        ..rotateY(-0.12),
       child: SizedBox(
         width: size,
         height: size,
@@ -36,46 +84,18 @@ class FootballBall extends StatelessWidget {
           alignment: Alignment.center,
           clipBehavior: Clip.none,
           children: [
-            // Neutral depth shadow only (no mint/green)
-            if (glow || selected)
-              Container(
-                width: size * 1.15,
-                height: size * 1.15,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.35),
-                      blurRadius: 10,
-                      spreadRadius: 0,
-                    ),
-                  ],
-                ),
-              ),
             Positioned(
-              bottom: 1,
+              bottom: 0,
               child: Container(
-                width: size * 0.65,
-                height: size * 0.16,
+                width: size * 0.55,
+                height: size * 0.12,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(99),
-                  color: Colors.black.withValues(alpha: 0.28),
+                  color: Colors.black.withValues(alpha: 0.3),
                 ),
               ),
             ),
-            Image.asset(
-              'assets/football/ball-real.webp',
-              width: size,
-              height: size,
-              fit: BoxFit.contain,
-              filterQuality: FilterQuality.high,
-              errorBuilder: (_, __, ___) => Image.asset(
-                'assets/football/ball-real.png',
-                width: size,
-                height: size,
-                fit: BoxFit.contain,
-              ),
-            ),
+            ClipOval(child: img),
           ],
         ),
       ),
@@ -84,28 +104,30 @@ class FootballBall extends StatelessWidget {
     if (!trail) return ball;
 
     return SizedBox(
-      width: size * 2.2,
-      height: size * 1.4,
+      width: size * 2.0,
+      height: size * 1.3,
       child: Stack(
         alignment: Alignment.centerRight,
         children: [
-          for (var i = 3; i >= 1; i--)
+          for (var i = 2; i >= 1; i--)
             Positioned(
-              right: i * size * 0.28,
+              right: i * size * 0.22,
               child: Opacity(
-                opacity: 0.12 * (4 - i),
+                opacity: 0.14 * (3 - i),
                 child: ImageFiltered(
-                  imageFilter: ui.ImageFilter.blur(sigmaX: 1.2 * i, sigmaY: 0.6),
+                  imageFilter: ui.ImageFilter.blur(sigmaX: 1.0 * i, sigmaY: 0.5),
                   child: Transform.rotate(
-                    angle: rotation - i * 0.35,
-                    child: Image.asset(
-                      'assets/football/ball-real.webp',
-                      width: size * (1 - i * 0.06),
-                      height: size * (1 - i * 0.06),
-                      errorBuilder: (_, __, ___) => Image.asset(
-                        'assets/football/ball-real.png',
-                        width: size * (1 - i * 0.06),
-                        height: size * (1 - i * 0.06),
+                    angle: rotation - i * 0.25,
+                    child: ClipOval(
+                      child: Image.asset(
+                        'assets/football/ball-real.webp',
+                        width: size * (1 - i * 0.08),
+                        height: size * (1 - i * 0.08),
+                        errorBuilder: (_, __, ___) => Image.asset(
+                          'assets/football/ball-real.png',
+                          width: size * (1 - i * 0.08),
+                          height: size * (1 - i * 0.08),
+                        ),
                       ),
                     ),
                   ),
@@ -119,7 +141,6 @@ class FootballBall extends StatelessWidget {
   }
 }
 
-/// Fallback painter if assets fail — kept for nav-bar tiny icons optional.
 class FootballBallPainterIcon extends StatelessWidget {
   const FootballBallPainterIcon({super.key, this.size = 24, this.selected = false});
   final double size;
@@ -127,8 +148,8 @@ class FootballBallPainterIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FootballBall(size: size, selected: selected, glow: selected);
+    return FootballBall(size: size, flat: true, selected: selected);
   }
 }
 
-double footballSpinForProgress(double t) => t * math.pi * 3.2;
+double footballSpinForProgress(double t) => t * math.pi * 2.4;

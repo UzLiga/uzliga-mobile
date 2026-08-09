@@ -5,8 +5,7 @@ import '../../../core/theme/app_theme.dart';
 import 'football_nav_controller.dart';
 import 'football_player.dart';
 
-/// Full-bleed Cyber Mint stage — player lives in the page atmosphere.
-/// Shown on Asosiy / O‘yinlar / Profil; hidden on Lavhalar (video).
+/// Ambient o‘yinchi — yumshoq fade, “stiker” emas.
 class FootballAmbientBackdrop extends ConsumerWidget {
   const FootballAmbientBackdrop({
     super.key,
@@ -15,7 +14,7 @@ class FootballAmbientBackdrop extends ConsumerWidget {
 
   final int tabIndex;
 
-  bool get _visible => tabIndex != 2; // reels stays cinematic black
+  bool get _visible => tabIndex != 2;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -38,23 +37,22 @@ class FootballAmbientBackdrop extends ConsumerWidget {
     );
 
     final size = MediaQuery.sizeOf(context);
-    final playerH = (size.height * 0.72).clamp(320.0, 560.0);
+    final playerH = (size.height * 0.58).clamp(280.0, 460.0);
 
-    // Per-tab framing so it feels designed, not copy-paste
     final align = switch (tabIndex) {
-      1 => Alignment.centerRight, // games
-      3 => Alignment.bottomRight, // profile
-      _ => Alignment.centerRight, // home
+      1 => Alignment.centerRight,
+      3 => Alignment.bottomRight,
+      _ => Alignment.centerRight,
     };
     final opacity = switch (tabIndex) {
-      1 => 0.78,
-      3 => 0.72,
-      _ => 0.92,
+      1 => 0.48,
+      3 => 0.42,
+      _ => 0.55,
     };
     final scale = switch (tabIndex) {
-      1 => 1.2,
-      3 => 1.1,
-      _ => 1.28,
+      1 => 1.05,
+      3 => 1.0,
+      _ => 1.08,
     };
 
     return IgnorePointer(
@@ -67,59 +65,91 @@ class FootballAmbientBackdrop extends ConsumerWidget {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  Color(0xFF041510),
-                  Color(0xFF06281C),
-                  Color(0xFF03140F),
+                  Color(0xFF06140F),
+                  Color(0xFF0A1C14),
+                  Color(0xFF050E0A),
                 ],
               ),
             ),
           ),
+          // Yumshoq chuqurlik — yashil “plash” emas
           DecoratedBox(
             decoration: BoxDecoration(
               gradient: RadialGradient(
-                center: const Alignment(0.75, -0.1),
-                radius: 1.15,
+                center: const Alignment(0.85, 0.1),
+                radius: 0.95,
                 colors: [
-                  AppColors.primary.withValues(alpha: 0.16),
-                  AppColors.primary.withValues(alpha: 0.05),
+                  Colors.white.withValues(alpha: 0.04),
                   Colors.transparent,
                 ],
-                stops: const [0, 0.35, 1],
               ),
             ),
           ),
-          CustomPaint(painter: _MintGridPainter()),
-          // Player — oq fon yo‘q, toza cutout
           Align(
             alignment: align,
             child: Opacity(
               opacity: opacity,
               child: Transform.translate(
-                offset: Offset(size.width * 0.06, tabIndex == 3 ? 24 : 8),
+                offset: Offset(size.width * 0.08, tabIndex == 3 ? 36 : 16),
                 child: Transform.scale(
                   scale: scale,
                   alignment: Alignment.bottomCenter,
-                  child: FootballPlayer(
-                    height: playerH,
-                    pose: pose,
-                    showBall: phase == FootballNavPhase.kick ||
-                        phase == FootballNavPhase.receive,
+                  child: ShaderMask(
+                    blendMode: BlendMode.dstIn,
+                    shaderCallback: (bounds) {
+                      return LinearGradient(
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withValues(alpha: 0.35),
+                          Colors.black.withValues(alpha: 0.9),
+                          Colors.black,
+                        ],
+                        stops: const [0.0, 0.18, 0.45, 1.0],
+                      ).createShader(bounds);
+                    },
+                    child: ShaderMask(
+                      blendMode: BlendMode.dstIn,
+                      shaderCallback: (bounds) {
+                        return const LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Color(0x00FFFFFF),
+                            Color(0xCCFFFFFF),
+                            Color(0xFFFFFFFF),
+                            Color(0xE6FFFFFF),
+                            Color(0x00FFFFFF),
+                          ],
+                          stops: [0.0, 0.12, 0.35, 0.78, 1.0],
+                        ).createShader(bounds);
+                      },
+                      child: FootballPlayer(
+                        height: playerH,
+                        pose: pose,
+                        showBall: phase == FootballNavPhase.kick ||
+                            phase == FootballNavPhase.receive,
+                      ),
+                    ),
                   ),
                 ),
               ),
             ),
           ),
+          // Chap kontent o‘qilishi
           DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.centerLeft,
                 end: Alignment.centerRight,
                 colors: [
-                  AppColors.bg.withValues(alpha: 0.82),
-                  AppColors.bg.withValues(alpha: 0.35),
+                  AppColors.bg.withValues(alpha: 0.92),
+                  AppColors.bg.withValues(alpha: 0.55),
+                  AppColors.bg.withValues(alpha: 0.12),
                   Colors.transparent,
                 ],
-                stops: const [0, 0.42, 0.78],
+                stops: const [0, 0.38, 0.62, 0.88],
               ),
             ),
           ),
@@ -130,9 +160,9 @@ class FootballAmbientBackdrop extends ConsumerWidget {
                 end: Alignment.bottomCenter,
                 colors: [
                   Colors.transparent,
-                  AppColors.bg.withValues(alpha: 0.55),
+                  AppColors.bg.withValues(alpha: 0.65),
                 ],
-                stops: const [0.72, 1],
+                stops: const [0.68, 1],
               ),
             ),
           ),
@@ -140,23 +170,4 @@ class FootballAmbientBackdrop extends ConsumerWidget {
       ),
     );
   }
-}
-
-class _MintGridPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final p = Paint()
-      ..color = const Color(0xFF00CC7A).withValues(alpha: 0.045)
-      ..strokeWidth = 1;
-    const step = 42.0;
-    for (double x = 0; x < size.width; x += step) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), p);
-    }
-    for (double y = 0; y < size.height; y += step) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), p);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

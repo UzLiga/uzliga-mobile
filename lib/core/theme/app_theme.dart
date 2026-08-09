@@ -1,32 +1,56 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+/// Playzon Green — bitta temperaturali yashil oila + glass.
+/// Sariq/gold brand yo‘q; status uchun warning/danger alohida.
 class AppColors {
-  /// Cyber Mint — hsl(155, 100%, 40%)
-  static const primary = Color(0xFF00CC7A);
-  static const primaryDark = Color(0xFF00A864);
-  static const primaryDeep = Color(0xFF008F55);
-  /// Tournament attention accent (FIFA-style)
-  static const lime = Color(0xFF46ED13);
-  static const gold = Color(0xFFE8B923);
-  static const goldDark = Color(0xFFB45309);
+  // Core green scale (mockup bilan bir xil oila)
+  static const primary = Color(0xFF12B76A);
+  static const primaryDark = Color(0xFF0E9F5C);
+  static const primaryDeep = Color(0xFF0B7A4B);
+  static const primarySoft = Color(0xFF3DD68C);
+  static const primaryMuted = Color(0xFF2A9B6A);
+
+  /// Accent highlight — soft green (eski lime/gold o‘rniga)
+  static const lime = primarySoft;
+  static const gold = primarySoft;
+  static const goldDark = primaryDeep;
+
+  // Dark pitch atmosphere
   static const bg = Color(0xFF041510);
-  static const surface = Color(0xFF0B221A);
-  static const surface2 = Color(0xFF103028);
-  static const edge = Color(0xFF1E4A3A);
+  static const surface = Color(0xFF0A1F17);
+  static const surface2 = Color(0xFF0F2A1F);
+  static const edge = Color(0xFF1A3D2E);
   static const ink = Color(0xFFF2FFF8);
   static const muted = Color(0xFF8FB8A6);
   static const faint = Color(0xFF5E8A76);
+
+  // Status (brend emas)
   static const danger = Color(0xFFEF4444);
   static const warning = Color(0xFFF59E0B);
 
+  // Glass tokens
+  static const glassFill = Color(0x14FFFFFF); // ~8% white
+  static const glassFillStrong = Color(0x24FFFFFF);
+  static const glassBorder = Color(0x33FFFFFF);
+  static const glassGreen = Color(0x2612B76A);
+
+  /// Soft radial glow under glass / pitch atmosphere (dark / light).
+  static const pitchGlowDark = Color(0x2912B76A); // ~16%
+  static const pitchGlowLight = Color(0x1A12B76A); // ~10%
+  /// Pitch grid / hatch opacity targets (3–6%).
+  static const pitchGridAlphaDark = 0.045;
+  static const pitchGridAlphaLight = 0.05;
+
   // Light
-  static const lightBg = Color(0xFFF2FBF7);
+  static const lightBg = Color(0xFFEFF8F3);
   static const lightSurface = Color(0xFFFFFFFF);
-  static const lightSurface2 = Color(0xFFE8F7F0);
+  static const lightSurface2 = Color(0xFFE6F5ED);
   static const lightEdge = Color(0xFFC5E6D6);
   static const lightInk = Color(0xFF06281C);
   static const lightMuted = Color(0xFF4A7A66);
+  static const lightGlassFill = Color(0xCCFFFFFF);
+  static const lightGlassBorder = Color(0x4012B76A);
 }
 
 ThemeData buildAppTheme() {
@@ -36,10 +60,10 @@ ThemeData buildAppTheme() {
     scaffoldBackgroundColor: AppColors.bg,
     colorScheme: const ColorScheme.dark(
       primary: AppColors.primary,
-      secondary: AppColors.primaryDark,
+      secondary: AppColors.primarySoft,
       surface: AppColors.surface,
       error: AppColors.danger,
-      onPrimary: Color(0xFF003D26),
+      onPrimary: Color(0xFF052E12),
       onSurface: AppColors.ink,
     ),
   );
@@ -62,7 +86,7 @@ ThemeData buildLightAppTheme() {
       secondary: AppColors.primaryDark,
       surface: AppColors.lightSurface,
       error: AppColors.danger,
-      onPrimary: Color(0xFF003D26),
+      onPrimary: Color(0xFF052E12),
       onSurface: AppColors.lightInk,
     ),
   );
@@ -87,8 +111,9 @@ ThemeData _finish(ThemeData base, TextTheme textTheme, {required bool dark}) {
   return base.copyWith(
     textTheme: textTheme,
     appBarTheme: AppBarTheme(
-      backgroundColor: bg.withValues(alpha: 0.92),
+      backgroundColor: bg.withValues(alpha: 0.88),
       elevation: 0,
+      scrolledUnderElevation: 0,
       centerTitle: false,
       foregroundColor: ink,
       titleTextStyle: textTheme.titleMedium?.copyWith(
@@ -129,6 +154,7 @@ ThemeData _finish(ThemeData base, TextTheme textTheme, {required bool dark}) {
         backgroundColor: AppColors.primary,
         foregroundColor: const Color(0xFF052E12),
         minimumSize: const Size.fromHeight(48),
+        elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         textStyle: textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
       ),
