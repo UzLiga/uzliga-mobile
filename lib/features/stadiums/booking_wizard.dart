@@ -13,7 +13,7 @@ import '../../core/theme/app_theme.dart';
 import '../../shared/format.dart';
 import '../../shared/models/models.dart';
 
-/// Toza bron oqimi — sana/vaqt → zakalat.
+/// Toza bron oqimi — sana/vaqt oralig‘i → zakalat.
 Future<void> openBookingWizard(
   BuildContext context, {
   required Stadium stadium,
@@ -38,11 +38,12 @@ class BookingSheet extends ConsumerStatefulWidget {
 class _BookingSheetState extends ConsumerState<BookingSheet> {
   int _step = 0; // 0 = vaqt, 1 = to‘lov
   late DateTime _date;
-  String? _slot;
+  String? _slot; // range start HH:mm
   int _duration = 1;
   Availability? _availability;
   bool _loadingSlots = false;
   bool _booking = false;
+  bool _daytimeOpen = false;
   XFile? _proof;
 
   Stadium get stadium => widget.stadium;
@@ -50,14 +51,53 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
 
   late final List<DateTime> _dates;
 
-  static const _dayNames = ['Du', 'Se', 'Ch', 'Pa', 'Ju', 'Sh', 'Ya'];
+  static const _dayNames = [
+    'Dushanba',
+    'Seshanba',
+    'Chorshanba',
+    'Payshanba',
+    'Juma',
+    'Shanba',
+    'Yakshanba',
+  ];
+  static const _dayShort = ['Du', 'Se', 'Ch', 'Pa', 'Ju', 'Sh', 'Ya'];
+  static const _monthUz = [
+    'yanvar',
+    'fevral',
+    'mart',
+    'aprel',
+    'may',
+    'iyun',
+    'iyul',
+    'avgust',
+    'sentabr',
+    'oktabr',
+    'noyabr',
+    'dekabr',
+  ];
+
+  /// Oy bo‘yicha yengil rang — oy nomini har sanaga yozmasdan ajratish.
+  static const _monthAccents = <Color>[
+    Color(0xFF5B8DEF), // yan
+    Color(0xFFE879A9), // fev
+    Color(0xFF46ED13), // mar
+    Color(0xFFF5A524), // apr
+    Color(0xFF22D3A6), // may
+    Color(0xFFA78BFA), // iyn
+    Color(0xFFFB7185), // iyl
+    Color(0xFF34D399), // avg
+    Color(0xFFFBBF24), // sen
+    Color(0xFF60A5FA), // okt
+    Color(0xFFF472B6), // noy
+    Color(0xFF2DD4BF), // dek
+  ];
 
   @override
   void initState() {
     super.initState();
     final n = DateTime.now();
     _date = DateTime(n.year, n.month, n.day);
-    _dates = List.generate(14, (i) => _date.add(Duration(days: i)));
+    _dates = List.generate(21, (i) => _date.add(Duration(days: i)));
     Future.microtask(_loadSlots);
   }
 
@@ -67,6 +107,8 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
     final m = int.tryParse(p.length > 1 ? p[1] : '0') ?? 0;
     return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
   }
+
+  int _hourOf(String t) => int.parse(_norm(t).split(':')[0]);
 
   String _endTime(String start, int hours) {
     final parts = _norm(start).split(':');
@@ -78,32 +120,91 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
   bool _sameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
 
-  bool _contiguousFree(String start) {
-    final byTime = {
-      for (final s in _availability?.slots ?? const <AvailabilitySlot>[])
-        _norm(s.startTime): s.available,
-    };
-    final parts = _norm(start).split(':');
-    var h = int.parse(parts[0]);
-    final m = parts[1];
-    for (var i = 0; i < _duration; i++) {
-      if (byTime[_norm('${h + i}:$m')] != true) return false;
+  String _prettyDate(DateTime d) => '${d.day}-${_monthUz[d.month - 1]}';
+
+  String _formatCard(String raw) {
+    final digits = raw.replaceAll(RegExp(r'\D'), '');
+    final buf = StringBuffer();
+    for (var i = 0; i < digits.length; i++) {
+      if (i > 0 && i % 4 == 0) buf.write(' ');
+      buf.write(digits[i]);
+    }
+    return buf.toString();
+  }
+
+  Map<String, bool> get _slotMap {
+    final map = <String, bool>{};
+    for (final s in _availability?.slots ?? const <AvailabilitySlot>[]) {
+      map[_norm(s.startTime)] = s.available;
+    }
+    return map;
+  }
+
+  List<AvailabilitySlot> get _allSlots =>
+      _availability?.slots ?? const <AvailabilitySlot>[];
+
+  bool _rangeFree(String start, int hours) {
+    final byTime = _slotMap;
+    final h0 = _hourOf(start);
+    final m = _norm(start).split(':')[1];
+    for (var i = 0; i < hours; i++) {
+      if (byTime[_norm('${h0 + i}:$m')] != true) return false;
     }
     return true;
   }
 
-  List<String> get _slots {
-    final raw = _availability?.slots ?? const <AvailabilitySlot>[];
-    return raw
-        .where((s) => s.available && _contiguousFree(s.startTime))
-        .map((s) => _norm(s.startTime))
-        .toList();
+  void _onTapHour(String time) {
+    final t = _norm(time);
+    final available = _slotMap[t] == true;
+    if (!available) {
+      _snack('Bu vaqt band');
+      return;
+    }
+
+    HapticFeedback.selectionClick();
+    setState(() {
+      if (_slot == null) {
+        _slot = t;
+        _duration = 1;
+        return;
+      }
+      final startH = _hourOf(_slot!);
+      final tapH = _hourOf(t);
+      if (tapH < startH) {
+        _slot = t;
+        _duration = 1;
+        return;
+      }
+      if (tapH == startH) {
+        _slot = null;
+        _duration = 1;
+        return;
+      }
+      final hours = tapH - startH + 1;
+      if (hours > 12) {
+        _snack('Maksimal 12 soat');
+        return;
+      }
+      if (!_rangeFree(_slot!, hours)) {
+        _snack('Oraliqda band soat bor — boshqa oralik tanlang');
+        return;
+      }
+      _duration = hours;
+    });
+  }
+
+  bool _inSelectedRange(String time) {
+    if (_slot == null) return false;
+    final h = _hourOf(time);
+    final start = _hourOf(_slot!);
+    return h >= start && h < start + _duration;
   }
 
   Future<void> _loadSlots() async {
     setState(() {
       _loadingSlots = true;
       _slot = null;
+      _duration = 1;
     });
     try {
       final a = await ref
@@ -138,6 +239,12 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
     setState(() => _proof = file);
   }
 
+  Future<void> _copyCard(String number) async {
+    await Clipboard.setData(ClipboardData(text: number.replaceAll(' ', '')));
+    HapticFeedback.lightImpact();
+    _snack('Karta raqami nusxalandi');
+  }
+
   Future<void> _pay() async {
     if (_slot == null || _booking) return;
     if (_proof == null) {
@@ -150,7 +257,6 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
     HapticFeedback.mediumImpact();
 
     try {
-      // create → chek → egasi tasdiqlamaguncha zakalat qabul qilinmaydi
       final created = await api.createBooking(
         stadiumId: stadium.id,
         date: _dateStr,
@@ -209,7 +315,7 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Zakalat ${formatPrice(deposit)} — stadion egasi chekni ko‘rib tasdiqlagach bron ochiladi.',
+                    'Zakalat ${formatPrice(deposit)} — stadion egasiga Telegram orqali xabar ketdi. Egasi chekni tasdiqlagach bron ochiladi.',
                     textAlign: TextAlign.center,
                     style: const TextStyle(color: AppColors.muted, height: 1.35),
                   ),
@@ -250,7 +356,7 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
       if (msg.contains('slot_taken') ||
           msg.toLowerCase().contains('band') ||
           (e is ApiException && e.statusCode == 409)) {
-        _snack('Bu vaqt band — boshqa slot tanlang');
+        _snack('Bu vaqt band — boshqa oralik tanlang');
         await _loadSlots();
       } else {
         _snack(msg);
@@ -266,6 +372,9 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
     final pad = MediaQuery.paddingOf(context);
     final total = stadium.pricePerHour * _duration;
     final deposit = stadium.depositFor(total);
+    final rangeLabel = _slot == null
+        ? null
+        : '${_prettyDate(_date)} · ${_norm(_slot!)}–${_endTime(_slot!, _duration)}';
 
     return Container(
       height: h * 0.92,
@@ -314,7 +423,9 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
                         ),
                       ),
                       Text(
-                        _step == 0 ? 'Sana va vaqt' : 'To‘lov va chek',
+                        _step == 0
+                            ? (rangeLabel ?? 'Sana va vaqt oralig‘i')
+                            : 'To‘lov · ${_prettyDate(_date)}',
                         style: const TextStyle(
                           color: AppColors.muted,
                           fontSize: 12,
@@ -331,13 +442,9 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
             child: Row(
               children: [
-                Expanded(
-                  child: _StepBar(active: true, label: '1'),
-                ),
+                const Expanded(child: _StepBar(active: true, label: '1')),
                 const SizedBox(width: 8),
-                Expanded(
-                  child: _StepBar(active: _step >= 1, label: '2'),
-                ),
+                Expanded(child: _StepBar(active: _step >= 1, label: '2')),
               ],
             ),
           ),
@@ -372,7 +479,7 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
                     : () {
                         if (_step == 0) {
                           if (_slot == null) {
-                            _snack('Vaqt tanlang');
+                            _snack('Vaqt oralig‘ini tanlang');
                             return;
                           }
                           HapticFeedback.selectionClick();
@@ -403,13 +510,13 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
                         _step == 0
                             ? (_slot == null
                                 ? 'Vaqt tanlang'
-                                : 'Davom · ${formatPrice(total)}')
+                                : 'Davom · ${_prettyDate(_date)} · ${formatPrice(total)}')
                             : (_proof == null
                                 ? 'Chekni yuklang'
-                                : 'To‘lash · ${formatPrice(total)}'),
+                                : 'Yuborish · ${formatPrice(deposit)}'),
                         style: const TextStyle(
                           fontWeight: FontWeight.w900,
-                          fontSize: 16,
+                          fontSize: 15,
                         ),
                       ),
               ),
@@ -421,18 +528,36 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
   }
 
   Widget _buildStepTime({Key? key}) {
-    final slots = _slots;
+    final all = _allSlots;
+    final evening = all.where((s) => _hourOf(s.startTime) >= 16).toList();
+    final daytime = all.where((s) => _hourOf(s.startTime) < 16).toList();
+    final now = DateTime.now();
+    final tomorrow = now.add(const Duration(days: 1));
+
     return ListView(
       key: key,
       padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
       children: [
-        const Text(
-          'Qaysi kuni?',
-          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+        Row(
+          children: [
+            const Text(
+              'Qaysi kuni?',
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+            ),
+            const Spacer(),
+            Text(
+              _monthUz[_date.month - 1],
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: _monthAccents[_date.month - 1],
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 10),
         SizedBox(
-          height: 78,
+          height: 96,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: _dates.length,
@@ -440,7 +565,14 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
             itemBuilder: (_, i) {
               final d = _dates[i];
               final sel = _sameDay(d, _date);
-              final today = _sameDay(d, DateTime.now());
+              final isToday = _sameDay(d, now);
+              final isTomorrow = _sameDay(d, tomorrow);
+              final accent = _monthAccents[d.month - 1];
+              final label = isToday
+                  ? 'Bugun'
+                  : isTomorrow
+                      ? 'Ertaga'
+                      : _dayShort[d.weekday - 1];
               return GestureDetector(
                 onTap: () {
                   HapticFeedback.selectionClick();
@@ -449,45 +581,48 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
                 },
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 180),
-                  width: 62,
+                  width: 68,
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    color: sel ? AppColors.gold : AppColors.surface,
+                    borderRadius: BorderRadius.circular(18),
+                    color: sel ? accent : AppColors.surface,
                     border: Border.all(
-                      color: sel ? AppColors.gold : AppColors.edge,
+                      color: sel ? accent : accent.withValues(alpha: 0.35),
+                      width: sel ? 2 : 1,
                     ),
                   ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        today ? 'Bugun' : _dayNames[d.weekday - 1],
+                        '${d.day}',
+                        style: TextStyle(
+                          fontSize: 26,
+                          height: 1,
+                          fontWeight: FontWeight.w900,
+                          color: sel ? const Color(0xFF0A120E) : AppColors.ink,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        label,
                         style: TextStyle(
                           fontSize: 11,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w800,
                           color: sel
-                              ? const Color(0xFF1A1000)
-                              : AppColors.faint,
+                              ? const Color(0xFF0A120E).withValues(alpha: 0.75)
+                              : AppColors.muted,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '${d.day}',
+                        _monthUz[d.month - 1].substring(0, 3),
                         style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w900,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.3,
                           color: sel
-                              ? const Color(0xFF1A1000)
-                              : AppColors.ink,
-                        ),
-                      ),
-                      Text(
-                        DateFormat('MMM').format(d),
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: sel
-                              ? const Color(0xFF1A1000).withValues(alpha: 0.65)
-                              : AppColors.muted,
+                              ? const Color(0xFF0A120E).withValues(alpha: 0.55)
+                              : accent,
                         ),
                       ),
                     ],
@@ -497,156 +632,151 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
             },
           ),
         ),
-        const SizedBox(height: 22),
-        const Text(
-          'Necha soat?',
-          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+        const SizedBox(height: 8),
+        Text(
+          _dayNames[_date.weekday - 1],
+          style: const TextStyle(color: AppColors.faint, fontSize: 12),
         ),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            for (final h in [1, 2, 3]) ...[
-              if (h > 1) const SizedBox(width: 8),
-              Expanded(
-                child: GestureDetector(
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    setState(() {
-                      _duration = h;
-                      if (_slot != null && !_contiguousFree(_slot!)) {
-                        _slot = null;
-                      }
-                    });
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 160),
-                    height: 52,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(14),
-                      color: _duration == h
-                          ? AppColors.primary.withValues(alpha: 0.2)
-                          : AppColors.surface,
-                      border: Border.all(
-                        color: _duration == h
-                            ? AppColors.primary
-                            : AppColors.edge,
-                        width: _duration == h ? 1.5 : 1,
-                      ),
-                    ),
-                    child: Text(
-                      '$h soat',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        color: _duration == h
-                            ? AppColors.primary
-                            : AppColors.ink,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-        const SizedBox(height: 22),
+        const SizedBox(height: 18),
         Row(
           children: [
             const Text(
-              'Bo‘sh vaqt',
+              'Bo‘sh vaqtlar',
               style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
             ),
             const Spacer(),
-            if (!_loadingSlots)
+            if (_slot != null)
               Text(
-                '${slots.length} ta',
-                style: const TextStyle(color: AppColors.faint, fontSize: 12),
+                '${_norm(_slot!)} – ${_endTime(_slot!, _duration)}',
+                style: const TextStyle(
+                  color: AppColors.gold,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13,
+                ),
               ),
           ],
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 4),
+        const Text(
+          'Boshlanish va tugash soatini bosing (masalan 18→21)',
+          style: TextStyle(color: AppColors.muted, fontSize: 12),
+        ),
+        const SizedBox(height: 12),
         if (_loadingSlots)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 40),
             child: Center(child: CircularProgressIndicator(strokeWidth: 2.5)),
           )
-        else if (slots.isEmpty)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
+        else if (all.isEmpty)
+          _emptyTimes()
+        else ...[
+          if (evening.isNotEmpty) ...[
+            const Text(
+              'Asosiy · 16:00 dan',
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                color: AppColors.muted,
+              ),
+            ),
+            const SizedBox(height: 8),
+            _timeGrid(evening, prominent: true),
+          ],
+          if (daytime.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Material(
               color: AppColors.surface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.edge),
-            ),
-            child: const Column(
-              children: [
-                Icon(Icons.event_busy_rounded, color: AppColors.faint, size: 32),
-                SizedBox(height: 8),
-                Text(
-                  'Bo‘sh slot yo‘q',
-                  style: TextStyle(fontWeight: FontWeight.w700),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  'Boshqa kun yoki 1 soatni tanlang',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: AppColors.muted, fontSize: 13),
-                ),
-              ],
-            ),
-          )
-        else
-          LayoutBuilder(
-            builder: (context, c) {
-              const gap = 8.0;
-              final cols = 3;
-              final w = (c.maxWidth - gap * (cols - 1)) / cols;
-              return Wrap(
-                spacing: gap,
-                runSpacing: gap,
-                children: [
-                  for (final s in slots)
-                    SizedBox(
-                      width: w,
-                      child: GestureDetector(
-                        onTap: () {
-                          HapticFeedback.selectionClick();
-                          setState(() => _slot = s);
-                        },
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 150),
-                          height: 48,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            color: _slot == s
-                                ? AppColors.gold
-                                : AppColors.surface2,
-                            border: Border.all(
-                              color: _slot == s
-                                  ? AppColors.gold
-                                  : AppColors.edge,
-                            ),
-                          ),
-                          child: Text(
-                            s,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 14,
-                              color: _slot == s
-                                  ? const Color(0xFF1A1000)
-                                  : AppColors.ink,
-                            ),
+              borderRadius: BorderRadius.circular(14),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(14),
+                onTap: () => setState(() => _daytimeOpen = !_daytimeOpen),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Kunduzgi vaqtlar · ${daytime.length} ta',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
                           ),
                         ),
                       ),
-                    ),
-                ],
-              );
-            },
-          ),
+                      Icon(
+                        _daytimeOpen
+                            ? Icons.expand_less_rounded
+                            : Icons.expand_more_rounded,
+                        color: AppColors.muted,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            if (_daytimeOpen) ...[
+              const SizedBox(height: 10),
+              _timeGrid(daytime, prominent: false),
+            ],
+          ],
+        ],
       ],
+    );
+  }
+
+  Widget _emptyTimes() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.edge),
+      ),
+      child: const Column(
+        children: [
+          Icon(Icons.event_busy_rounded, color: AppColors.faint, size: 32),
+          SizedBox(height: 8),
+          Text(
+            'Bu kunda slot yo‘q',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+          SizedBox(height: 4),
+          Text(
+            'Boshqa kunni tanlang',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: AppColors.muted, fontSize: 13),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _timeGrid(List<AvailabilitySlot> slots, {required bool prominent}) {
+    return LayoutBuilder(
+      builder: (context, c) {
+        const gap = 8.0;
+        final cols = 4;
+        final w = (c.maxWidth - gap * (cols - 1)) / cols;
+        return Wrap(
+          spacing: gap,
+          runSpacing: gap,
+          children: [
+            for (final s in slots)
+              SizedBox(
+                width: w,
+                child: _TimeChip(
+                  time: _norm(s.startTime),
+                  available: s.available,
+                  selected: _inSelectedRange(s.startTime),
+                  prominent: prominent,
+                  onTap: () => _onTapHour(s.startTime),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 
@@ -657,8 +787,10 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
   }) {
     final start = _slot ?? '--:--';
     final end = _slot != null ? _endTime(_slot!, _duration) : '--:--';
-    final dayLabel = '${_date.day}.${_date.month}.${_date.year}';
-    final card = stadium.payoutCardMasked;
+    final dayLabel = _prettyDate(_date);
+    final rawCard = stadium.payoutCardNumber?.replaceAll(RegExp(r'\s+'), '');
+    final cardPretty =
+        rawCard != null && rawCard.isNotEmpty ? _formatCard(rawCard) : null;
     final holder = stadium.payoutCardHolder;
 
     return ListView(
@@ -701,12 +833,12 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
               Row(
                 children: [
                   const Text(
-                    'To‘lov summasi',
+                    'Zakalat',
                     style: TextStyle(fontWeight: FontWeight.w700),
                   ),
                   const Spacer(),
                   Text(
-                    formatPrice(total),
+                    formatPrice(deposit),
                     style: const TextStyle(
                       fontWeight: FontWeight.w900,
                       fontSize: 22,
@@ -715,42 +847,110 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
                   ),
                 ],
               ),
+              if (deposit < total) ...[
+                const SizedBox(height: 4),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    'Jami ${formatPrice(total)} · qolgani maydonda',
+                    style: const TextStyle(color: AppColors.faint, fontSize: 12),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
         const SizedBox(height: 14),
+        // Prominent copyable card
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
           decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.edge),
+            borderRadius: BorderRadius.circular(18),
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF1E3A2F), Color(0xFF0F1F18)],
+            ),
+            border: Border.all(color: const Color(0xFF46ED13), width: 1.4),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF46ED13).withValues(alpha: 0.12),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Egasi kartasi',
-                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+              const Row(
+                children: [
+                  Icon(Icons.credit_card_rounded,
+                      color: Color(0xFF46ED13), size: 18),
+                  SizedBox(width: 8),
+                  Text(
+                    'Shu kartaga o‘tkazing',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                      color: Color(0xFF46ED13),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 8),
-              Text(
-                card ?? 'Karta hali kiritilmagan — egasi bilan bog‘laning',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 16,
-                  color: card == null ? AppColors.muted : AppColors.ink,
+              const SizedBox(height: 14),
+              if (cardPretty != null) ...[
+                SelectableText(
+                  cardPretty,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 22,
+                    letterSpacing: 1.2,
+                    height: 1.2,
+                    fontFeatures: [FontFeature.tabularFigures()],
+                  ),
                 ),
-              ),
-              if (holder != null && holder.isNotEmpty) ...[
-                const SizedBox(height: 4),
-                Text(holder, style: const TextStyle(color: AppColors.muted)),
-              ],
-              const SizedBox(height: 8),
+                if (holder != null && holder.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    holder,
+                    style: const TextStyle(
+                      color: AppColors.muted,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton.icon(
+                    onPressed: () => _copyCard(rawCard!),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF46ED13),
+                      foregroundColor: const Color(0xFF06210C),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    icon: const Icon(Icons.copy_rounded, size: 18),
+                    label: const Text(
+                      'Raqamni nusxalash',
+                      style: TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                  ),
+                ),
+              ] else
+                const Text(
+                  'Karta hali kiritilmagan — egasi bilan bog‘laning',
+                  style: TextStyle(color: AppColors.muted, height: 1.35),
+                ),
+              const SizedBox(height: 10),
               const Text(
-                'Pul o‘tkazing, keyin chek rasmini yuklang — u to‘g‘ridan-to‘g‘ri stadion egasiga boradi.',
-                style: TextStyle(color: AppColors.muted, fontSize: 13),
+                'Pul o‘tkazib, chek rasmini yuklang — egaga Telegram orqali foiz bilan keladi.',
+                style: TextStyle(color: AppColors.muted, fontSize: 12, height: 1.35),
               ),
             ],
           ),
@@ -826,13 +1026,6 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
             ),
           ),
         ),
-        if (deposit > 0 && deposit < total) ...[
-          const SizedBox(height: 12),
-          Text(
-            'Eslatma: zakalat ${formatPrice(deposit)}, qolgani maydonda.',
-            style: const TextStyle(color: AppColors.faint, fontSize: 12),
-          ),
-        ],
       ],
     );
   }
@@ -846,6 +1039,64 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
         const Spacer(),
         Text(value, style: const TextStyle(fontWeight: FontWeight.w700)),
       ],
+    );
+  }
+}
+
+class _TimeChip extends StatelessWidget {
+  const _TimeChip({
+    required this.time,
+    required this.available,
+    required this.selected,
+    required this.prominent,
+    required this.onTap,
+  });
+
+  final String time;
+  final bool available;
+  final bool selected;
+  final bool prominent;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final booked = !available;
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        height: prominent ? 48 : 42,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          color: selected
+              ? AppColors.gold
+              : booked
+                  ? const Color(0xFF2A1216)
+                  : AppColors.surface2,
+          border: Border.all(
+            color: selected
+                ? AppColors.gold
+                : booked
+                    ? const Color(0xFFE11D48).withValues(alpha: 0.55)
+                    : AppColors.edge,
+          ),
+        ),
+        child: Text(
+          time,
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: prominent ? 14 : 13,
+            decoration: booked ? TextDecoration.lineThrough : null,
+            decorationColor: const Color(0xFFE11D48),
+            color: selected
+                ? const Color(0xFF1A1000)
+                : booked
+                    ? const Color(0xFFE11D48)
+                    : AppColors.ink,
+          ),
+        ),
+      ),
     );
   }
 }
