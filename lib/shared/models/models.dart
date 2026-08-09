@@ -26,6 +26,12 @@ class UserBrief {
     this.avatarUrl,
     this.position,
     this.rating = 4.5,
+    this.pace = 65,
+    this.shooting = 65,
+    this.passing = 65,
+    this.dribbling = 65,
+    this.defending = 65,
+    this.stamina = 65,
   });
 
   final int id;
@@ -33,6 +39,22 @@ class UserBrief {
   final String? avatarUrl;
   final String? position;
   final double rating;
+  final int pace;
+  final int shooting;
+  final int passing;
+  final int dribbling;
+  final int defending;
+  final int stamina;
+
+  int get overall {
+    final vals = [pace, shooting, passing, dribbling, defending, stamina];
+    return (vals.reduce((a, b) => a + b) / vals.length).round();
+  }
+
+  String get firstName {
+    final parts = fullName.trim().split(RegExp(r'\s+'));
+    return parts.isEmpty ? 'Chempion' : parts.first;
+  }
 
   factory UserBrief.fromJson(Map<String, dynamic> json) => UserBrief(
         id: json['id'] as int,
@@ -40,6 +62,12 @@ class UserBrief {
         avatarUrl: json['avatar_url'] as String?,
         position: json['position'] as String?,
         rating: (json['rating'] as num?)?.toDouble() ?? 4.5,
+        pace: (json['pace'] as num?)?.toInt() ?? 65,
+        shooting: (json['shooting'] as num?)?.toInt() ?? 65,
+        passing: (json['passing'] as num?)?.toInt() ?? 65,
+        dribbling: (json['dribbling'] as num?)?.toInt() ?? 65,
+        defending: (json['defending'] as num?)?.toInt() ?? 65,
+        stamina: (json['stamina'] as num?)?.toInt() ?? 65,
       );
 }
 
@@ -50,14 +78,36 @@ class User extends UserBrief {
     super.avatarUrl,
     super.position,
     super.rating,
+    super.pace,
+    super.shooting,
+    super.passing,
+    super.dribbling,
+    super.defending,
+    super.stamina,
     this.phone,
     this.topBalance = 0,
     this.gamesPlayed = 0,
     this.goals = 0,
     this.assists = 0,
     this.isPremium = false,
+    this.isVerified = false,
     this.role = 'player',
     this.createdAt,
+    this.yellowCards = 0,
+    this.redCards = 0,
+    this.gender,
+    this.birthYear,
+    this.referralCode,
+    this.isStadiumOwner = false,
+    this.careerTitle,
+    this.careerLevel = 1,
+    this.careerDiscountPercent = 0,
+    this.careerShopHint,
+    this.careerProgress = 0,
+    this.careerGamesToNext = 5,
+    this.heightCm,
+    this.weightKg,
+    this.preferredFoot,
   });
 
   final String? phone;
@@ -66,8 +116,24 @@ class User extends UserBrief {
   final int goals;
   final int assists;
   final bool isPremium;
+  final bool isVerified;
   final String role;
   final String? createdAt;
+  final int yellowCards;
+  final int redCards;
+  final String? gender;
+  final int? birthYear;
+  final String? referralCode;
+  final bool isStadiumOwner;
+  final String? careerTitle;
+  final int careerLevel;
+  final int careerDiscountPercent;
+  final String? careerShopHint;
+  final double careerProgress;
+  final int careerGamesToNext;
+  final int? heightCm;
+  final int? weightKg;
+  final String? preferredFoot;
 
   factory User.fromJson(Map<String, dynamic> json) => User(
         id: json['id'] as int,
@@ -81,14 +147,33 @@ class User extends UserBrief {
         goals: (json['goals'] as num?)?.toInt() ?? 0,
         assists: (json['assists'] as num?)?.toInt() ?? 0,
         isPremium: json['is_premium'] as bool? ?? false,
+        isVerified: json['is_verified'] as bool? ?? false,
         role: json['role'] as String? ?? 'player',
         createdAt: json['created_at'] as String?,
+        pace: (json['pace'] as num?)?.toInt() ?? 65,
+        shooting: (json['shooting'] as num?)?.toInt() ?? 65,
+        passing: (json['passing'] as num?)?.toInt() ?? 65,
+        dribbling: (json['dribbling'] as num?)?.toInt() ?? 65,
+        defending: (json['defending'] as num?)?.toInt() ?? 65,
+        stamina: (json['stamina'] as num?)?.toInt() ?? 65,
+        yellowCards: (json['yellow_cards'] as num?)?.toInt() ?? 0,
+        redCards: (json['red_cards'] as num?)?.toInt() ?? 0,
+        gender: json['gender'] as String?,
+        birthYear: (json['birth_year'] as num?)?.toInt(),
+        referralCode: json['referral_code'] as String?,
+        isStadiumOwner: json['is_stadium_owner'] as bool? ?? false,
+        careerTitle: json['career_title'] as String?,
+        careerLevel: (json['career_level'] as num?)?.toInt() ?? 1,
+        careerDiscountPercent:
+            (json['career_discount_percent'] as num?)?.toInt() ?? 0,
+        careerShopHint: json['career_shop_hint'] as String?,
+        careerProgress: (json['career_progress'] as num?)?.toDouble() ?? 0,
+        careerGamesToNext:
+            (json['career_games_to_next'] as num?)?.toInt() ?? 5,
+        heightCm: (json['height_cm'] as num?)?.toInt(),
+        weightKg: (json['weight_kg'] as num?)?.toInt(),
+        preferredFoot: json['preferred_foot'] as String?,
       );
-
-  String get firstName {
-    final parts = fullName.trim().split(RegExp(r'\s+'));
-    return parts.isEmpty ? 'Chempion' : parts.first;
-  }
 }
 
 class StadiumBrief {
@@ -98,6 +183,10 @@ class StadiumBrief {
     required this.district,
     required this.imageUrl,
     required this.pricePerHour,
+    this.minBookingType = 'percent',
+    this.minBookingValue = 0,
+    this.payoutCardNumber,
+    this.payoutCardHolder,
   });
 
   final int id;
@@ -105,6 +194,22 @@ class StadiumBrief {
   final String district;
   final String imageUrl;
   final int pricePerHour;
+  final String minBookingType;
+  final int minBookingValue;
+  final String? payoutCardNumber;
+  final String? payoutCardHolder;
+
+  int depositFor(int total) {
+    if (minBookingValue <= 0) return (total * 0.3).round().clamp(0, total);
+    if (minBookingType == 'fixed') return minBookingValue.clamp(0, total);
+    return ((total * minBookingValue) / 100).round().clamp(0, total);
+  }
+
+  String? get payoutCardMasked {
+    final n = payoutCardNumber?.replaceAll(RegExp(r'\s+'), '') ?? '';
+    if (n.length < 4) return null;
+    return '**** **** **** ${n.substring(n.length - 4)}';
+  }
 
   factory StadiumBrief.fromJson(Map<String, dynamic> json) => StadiumBrief(
         id: json['id'] as int,
@@ -112,6 +217,10 @@ class StadiumBrief {
         district: json['district'] as String? ?? '',
         imageUrl: json['image_url'] as String? ?? '',
         pricePerHour: (json['price_per_hour'] as num?)?.toInt() ?? 0,
+        minBookingType: json['min_booking_type'] as String? ?? 'percent',
+        minBookingValue: (json['min_booking_value'] as num?)?.toInt() ?? 0,
+        payoutCardNumber: json['payout_card_number'] as String?,
+        payoutCardHolder: json['payout_card_holder'] as String?,
       );
 }
 
@@ -137,6 +246,10 @@ class Stadium {
     this.lat,
     this.lng,
     this.phone,
+    this.minBookingType = 'percent',
+    this.minBookingValue = 0,
+    this.payoutCardNumber,
+    this.payoutCardHolder,
   });
 
   final int id;
@@ -159,6 +272,28 @@ class Stadium {
   final double? lat;
   final double? lng;
   final String? phone;
+  final String minBookingType;
+  final int minBookingValue;
+  final String? payoutCardNumber;
+  final String? payoutCardHolder;
+
+  /// Zakalat (deposit) for a given total price.
+  int depositFor(int total) {
+    if (minBookingValue <= 0) {
+      // Default 30% if owner hasn't configured
+      return (total * 0.3).round().clamp(0, total);
+    }
+    if (minBookingType == 'fixed') {
+      return minBookingValue.clamp(0, total);
+    }
+    return ((total * minBookingValue) / 100).round().clamp(0, total);
+  }
+
+  String? get payoutCardMasked {
+    final n = payoutCardNumber?.replaceAll(RegExp(r'\s+'), '') ?? '';
+    if (n.length < 4) return null;
+    return '**** **** **** ${n.substring(n.length - 4)}';
+  }
 
   factory Stadium.fromJson(Map<String, dynamic> json) => Stadium(
         id: json['id'] as int,
@@ -183,6 +318,10 @@ class Stadium {
         lat: (json['lat'] as num?)?.toDouble(),
         lng: (json['lng'] as num?)?.toDouble(),
         phone: json['phone'] as String?,
+        minBookingType: json['min_booking_type'] as String? ?? 'percent',
+        minBookingValue: (json['min_booking_value'] as num?)?.toInt() ?? 0,
+        payoutCardNumber: json['payout_card_number'] as String?,
+        payoutCardHolder: json['payout_card_holder'] as String?,
       );
 }
 
@@ -251,8 +390,10 @@ class Booking {
         createdAt: json['created_at']?.toString() ?? '',
       );
 
-  bool get isPending => status == 'pending_payment';
-  bool get isConfirmed => status == 'confirmed';
+  bool get isPending =>
+      status == 'pending_payment' || status == 'awaiting_payment';
+  bool get isConfirmed =>
+      status == 'confirmed' || status == 'pending' || status == 'playing';
   bool get isCancelled => status == 'cancelled';
 }
 
@@ -269,6 +410,8 @@ class Team {
     this.logoUrl,
     this.description,
     this.inviteCode,
+    this.formatSize = 7,
+    this.district,
   });
 
   final int id;
@@ -282,6 +425,8 @@ class Team {
   final int draws;
   final String createdAt;
   final String? inviteCode;
+  final int formatSize;
+  final String? district;
 
   factory Team.fromJson(Map<String, dynamic> json) => Team(
         id: json['id'] as int,
@@ -295,6 +440,8 @@ class Team {
         draws: (json['draws'] as num?)?.toInt() ?? 0,
         createdAt: json['created_at']?.toString() ?? '',
         inviteCode: json['invite_code'] as String?,
+        formatSize: (json['format_size'] as num?)?.toInt() ?? 7,
+        district: json['district'] as String?,
       );
 }
 
@@ -330,6 +477,8 @@ class TeamDetail extends Team {
     super.logoUrl,
     super.description,
     super.inviteCode,
+    super.formatSize,
+    super.district,
   });
 
   final List<TeamMember> members;
@@ -348,6 +497,8 @@ class TeamDetail extends Team {
       draws: base.draws,
       createdAt: base.createdAt,
       inviteCode: base.inviteCode,
+      formatSize: base.formatSize,
+      district: base.district,
       members: (json['members'] as List? ?? const [])
           .whereType<Map>()
           .map((e) => TeamMember.fromJson(Map<String, dynamic>.from(e)))
@@ -521,6 +672,7 @@ class MatchClip {
     this.stadiumName,
     this.matchDate,
     this.matchTime,
+    this.hashtags = const [],
   });
 
   final int id;
@@ -540,6 +692,7 @@ class MatchClip {
   final String? stadiumName;
   final String? matchDate;
   final String? matchTime;
+  final List<String> hashtags;
 
   String get streamUrl =>
       (playbackUrl != null && playbackUrl!.isNotEmpty) ? playbackUrl! : mediaUrl;
@@ -564,6 +717,10 @@ class MatchClip {
         stadiumName: json['stadium_name'] as String?,
         matchDate: json['match_date'] as String?,
         matchTime: json['match_time'] as String?,
+        hashtags: (json['hashtags'] as List? ?? const [])
+            .map((e) => e.toString())
+            .where((e) => e.isNotEmpty)
+            .toList(),
       );
 }
 
@@ -644,6 +801,8 @@ class TournamentMatch {
     required this.id,
     required this.round,
     required this.status,
+    this.team1Id,
+    this.team2Id,
     this.team1Name,
     this.team2Name,
     this.score1,
@@ -655,6 +814,8 @@ class TournamentMatch {
   final int id;
   final int round;
   final String status;
+  final int? team1Id;
+  final int? team2Id;
   final String? team1Name;
   final String? team2Name;
   final int? score1;
@@ -662,10 +823,15 @@ class TournamentMatch {
   final int? winnerTeamId;
   final String? stadiumName;
 
+  bool get isPlayed =>
+      status == 'played' || status == 'finished' || status == 'walkover';
+
   factory TournamentMatch.fromJson(Map<String, dynamic> json) => TournamentMatch(
         id: json['id'] as int,
         round: (json['round'] as num?)?.toInt() ?? 1,
         status: json['status'] as String? ?? 'scheduled',
+        team1Id: (json['team1_id'] as num?)?.toInt(),
+        team2Id: (json['team2_id'] as num?)?.toInt(),
         team1Name: json['team1_name'] as String?,
         team2Name: json['team2_name'] as String?,
         score1: (json['score1'] as num?)?.toInt(),

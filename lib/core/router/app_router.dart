@@ -5,30 +5,37 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/auth_provider.dart';
 import '../../features/auth/auth_screens.dart';
 import '../../features/home/home_screen.dart';
+import '../../features/stadiums/stadiums_map_screen.dart';
 import '../../features/stadiums/stadiums_screen.dart';
 import '../../features/games/games_screen.dart';
+import '../../features/battles/battles_screen.dart';
 import '../../features/teams/teams_screen.dart';
 import '../../features/profile/profile_screen.dart';
 import '../../features/profile/user_profile_screen.dart';
 import '../../features/reels/reels_screen.dart';
+import '../../features/reels/my_reels_screen.dart';
+import '../../features/reels/hashtag_feed_screen.dart';
+import '../../features/reels/clip_composer_screen.dart';
 import '../../features/shell/shell_screen.dart';
 import '../../features/tournaments/tournaments_screen.dart';
 import '../../features/notifications/notifications_screen.dart';
+import '../../features/premium/premium_screen.dart';
 import '../../features/wallet/wallet_screen.dart';
 import '../../features/free_agents/free_agents_screen.dart';
 import '../api/token_storage.dart';
+import '../analytics.dart';
 
 final _rootKey = GlobalKey<NavigatorState>();
 
 final routerProvider = Provider<GoRouter>((ref) {
-  final auth = ref.watch(authProvider);
-  final onboarding = ref.watch(onboardingDoneProvider);
-
+  // IMPORTANT: do not watch auth here — remounts entire app shell on every refreshMe()
   return GoRouter(
     navigatorKey: _rootKey,
     initialLocation: '/splash',
     refreshListenable: _AuthRefresh(ref),
     redirect: (context, state) {
+      final auth = ref.read(authProvider);
+      final onboarding = ref.read(onboardingDoneProvider);
       final loc = state.matchedLocation;
       final status = auth.status;
 
@@ -119,12 +126,26 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, __) => const StadiumsScreen(),
         routes: [
           GoRoute(
+            path: 'map',
+            builder: (_, __) => const StadiumsMapScreen(),
+          ),
+          GoRoute(
             path: ':id',
             builder: (_, state) => StadiumDetailScreen(
               stadiumId: int.parse(state.pathParameters['id']!),
             ),
           ),
         ],
+      ),
+      GoRoute(
+        path: '/app/map',
+        parentNavigatorKey: _rootKey,
+        builder: (_, __) => const StadiumsMapScreen(),
+      ),
+      GoRoute(
+        path: '/app/battles',
+        parentNavigatorKey: _rootKey,
+        builder: (_, __) => const BattlesScreen(),
       ),
       GoRoute(
         path: '/app/teams',
@@ -157,7 +178,18 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/app/wallet',
         parentNavigatorKey: _rootKey,
-        builder: (_, __) => const WalletScreen(),
+        builder: (_, __) {
+          Analytics.log('open_wallet');
+          return const WalletScreen();
+        },
+      ),
+      GoRoute(
+        path: '/app/premium',
+        parentNavigatorKey: _rootKey,
+        builder: (_, __) {
+          Analytics.log('open_premium');
+          return const PremiumPaywallScreen();
+        },
       ),
       GoRoute(
         path: '/app/free-agents',
@@ -181,6 +213,23 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/app/bookings',
         parentNavigatorKey: _rootKey,
         builder: (_, __) => const BookingsScreen(),
+      ),
+      GoRoute(
+        path: '/app/my-reels',
+        parentNavigatorKey: _rootKey,
+        builder: (_, __) => const MyReelsManageScreen(),
+      ),
+      GoRoute(
+        path: '/app/clip-composer',
+        parentNavigatorKey: _rootKey,
+        builder: (_, __) => const ClipComposerScreen(),
+      ),
+      GoRoute(
+        path: '/app/hashtag/:tag',
+        parentNavigatorKey: _rootKey,
+        builder: (_, state) => HashtagFeedScreen(
+          tag: state.pathParameters['tag']!,
+        ),
       ),
       GoRoute(
         path: '/app/users/:id',

@@ -8,12 +8,14 @@ import '../../shared/format.dart';
 import '../../shared/models/models.dart';
 import '../../shared/widgets/widgets.dart';
 import '../auth/auth_provider.dart';
+import '../shell/football_nav/football_nav_controller.dart';
+import '../shell/shell_screen.dart';
 
-final homeStadiumsProvider = FutureProvider.autoDispose((ref) {
+final homeStadiumsProvider = FutureProvider((ref) {
   return ref.watch(apiClientProvider).listStadiums(limit: 8, sort: '-rating');
 });
 
-final homeGamesProvider = FutureProvider.autoDispose((ref) {
+final homeGamesProvider = FutureProvider((ref) {
   return ref.watch(apiClientProvider).listGames(status: 'open', limit: 5);
 });
 
@@ -26,151 +28,88 @@ class HomeScreen extends ConsumerWidget {
     final stadiums = ref.watch(homeStadiumsProvider);
     final games = ref.watch(homeGamesProvider);
     final name = auth.user?.firstName ?? 'Chempion';
+    final heroUrl = stadiums.maybeWhen(
+      data: (p) => p.items.isNotEmpty ? p.items.first.imageUrl : null,
+      orElse: () => null,
+    );
 
     return Scaffold(
+      backgroundColor: Colors.transparent,
       body: RefreshIndicator(
         color: AppColors.primary,
         onRefresh: () async {
           ref.invalidate(homeStadiumsProvider);
           ref.invalidate(homeGamesProvider);
-          await ref.read(authProvider.notifier).refreshMe();
         },
         child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
-            SliverAppBar(
-              pinned: true,
-              title: Text(
-                'Salom, $name',
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+            SliverToBoxAdapter(
+              child: _HomeHero(
+                name: name,
+                heroImageUrl: heroUrl,
+                onWallet: () => context.push('/app/wallet'),
+                onNotif: () => context.push('/app/notifications'),
+                onBook: () => context.push('/app/stadiums'),
+                onPlay: () => context.go('/app/games'),
               ),
-              actions: [
-                IconButton(
-                  onPressed: () => context.push('/app/wallet'),
-                  icon: const Icon(Icons.account_balance_wallet_outlined),
-                  tooltip: 'Hamyon',
-                ),
-                IconButton(
-                  onPressed: () => context.push('/app/notifications'),
-                  icon: const Icon(Icons.notifications_outlined),
-                  tooltip: 'Bildirishnomalar',
-                ),
-                IconButton(
-                  onPressed: () => context.push('/app/bookings'),
-                  icon: const Icon(Icons.calendar_month_outlined),
-                  tooltip: 'Bronlar',
-                ),
-              ],
             ),
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
+                child: Row(
                   children: [
-                    // Pillar main — book
-                    InkWell(
-                      onTap: () => context.go('/app/stadiums'),
-                      borderRadius: BorderRadius.circular(18),
-                      child: Container(
-                        padding: const EdgeInsets.all(18),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(18),
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF166534), Color(0xFF0B1510)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          border: Border.all(
-                            color: AppColors.primary.withValues(alpha: 0.35),
-                          ),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Maydon bron qilish',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            const Text(
-                              'Yaqiningdagi bo‘sh maydonlar — bir necha tegishda band qil.',
-                              style: TextStyle(color: AppColors.muted, height: 1.35),
-                            ),
-                            const SizedBox(height: 14),
-                            ElevatedButton.icon(
-                              onPressed: () => context.go('/app/stadiums'),
-                              icon: const Icon(Icons.calendar_month, size: 18),
-                              label: const Text('Boshlash'),
-                            ),
-                          ],
-                        ),
-                      ),
+                    _NavChip(
+                      icon: Icons.sports_soccer,
+                      label: 'O‘yinlar',
+                      onTap: () {
+                        final shell = ref.read(shellTabIndexProvider);
+                        ref.read(footballNavProvider.notifier).runTo(
+                              from: shell,
+                              to: 1,
+                              reduceMotion:
+                                  MediaQuery.disableAnimationsOf(context),
+                              go: () => context.go('/app/games'),
+                            );
+                      },
                     ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _MiniPillar(
-                            title: 'O‘yinlar',
-                            subtitle: 'Ochiq matchlar',
-                            icon: Icons.sports_soccer,
-                            color: AppColors.warning,
-                            onTap: () => context.go('/app/games'),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _MiniPillar(
-                            title: 'Jamoalar',
-                            subtitle: 'Jamoa top / yarat',
-                            icon: Icons.groups,
-                            color: const Color(0xFF38BDF8),
-                            onTap: () => context.go('/app/teams'),
-                          ),
-                        ),
-                      ],
+                    _NavChip(
+                      icon: Icons.groups_outlined,
+                      label: 'Jamoalar',
+                      onTap: () => context.push('/app/teams'),
                     ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _MiniPillar(
-                            title: 'Turnirlar',
-                            subtitle: 'Setka · chempionat',
-                            icon: Icons.emoji_events,
-                            color: AppColors.primary,
-                            onTap: () => context.push('/app/tournaments'),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _MiniPillar(
-                            title: 'Sherik',
-                            subtitle: 'Free agent',
-                            icon: Icons.handshake_outlined,
-                            color: const Color(0xFFA78BFA),
-                            onTap: () => context.push('/app/free-agents'),
-                          ),
-                        ),
-                      ],
+                    _NavChip(
+                      icon: Icons.emoji_events_outlined,
+                      label: 'Turnir',
+                      onTap: () => context.push('/app/tournaments'),
                     ),
-                    const SizedBox(height: 24),
-                    SectionHeader(
-                      title: 'Tavsiya etilgan maydonlar',
-                      actionLabel: 'Hammasi',
-                      onAction: () => context.go('/app/stadiums'),
+                    _NavChip(
+                      icon: Icons.handshake_outlined,
+                      label: 'Sherik',
+                      onTap: () => context.push('/app/free-agents'),
                     ),
                   ],
                 ),
               ),
             ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 22, 16, 0),
+                child: SectionHeader(
+                  title: 'Yaqin maydonlar',
+                  actionLabel: 'Hammasi',
+                  onAction: () => context.push('/app/stadiums'),
+                ),
+              ),
+            ),
             stadiums.when(
+              skipLoadingOnReload: true,
+              skipLoadingOnRefresh: true,
               loading: () => const SliverToBoxAdapter(
-                child: Padding(padding: EdgeInsets.all(24), child: LoadingView()),
+                child: Padding(
+                  padding: EdgeInsets.all(24),
+                  child: LoadingView(),
+                ),
               ),
               error: (e, _) => SliverToBoxAdapter(
                 child: ErrorView(
@@ -182,18 +121,21 @@ class HomeScreen extends ConsumerWidget {
                   ? const SliverToBoxAdapter(
                       child: Padding(
                         padding: EdgeInsets.all(16),
-                        child: Text('Maydonlar yuklanmoqda…',
-                            style: TextStyle(color: AppColors.muted)),
+                        child: Text(
+                          'Maydon topilmadi',
+                          style: TextStyle(color: AppColors.muted),
+                        ),
                       ),
                     )
                   : SliverToBoxAdapter(
                       child: SizedBox(
-                        height: 210,
+                        height: 228,
                         child: ListView.separated(
-                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                          padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
                           scrollDirection: Axis.horizontal,
-                          itemCount: page.items.length.clamp(0, 6),
-                          separatorBuilder: (_, __) => const SizedBox(width: 12),
+                          itemCount: page.items.length.clamp(0, 8),
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(width: 12),
                           itemBuilder: (context, i) {
                             return _StadiumCard(
                               stadium: page.items[i],
@@ -206,7 +148,7 @@ class HomeScreen extends ConsumerWidget {
             ),
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+                padding: const EdgeInsets.fromLTRB(16, 22, 16, 8),
                 child: SectionHeader(
                   title: 'Ochiq o‘yinlar',
                   actionLabel: 'Hammasi',
@@ -215,6 +157,8 @@ class HomeScreen extends ConsumerWidget {
               ),
             ),
             games.when(
+              skipLoadingOnReload: true,
+              skipLoadingOnRefresh: true,
               loading: () => const SliverToBoxAdapter(child: LoadingView()),
               error: (e, _) => SliverToBoxAdapter(
                 child: ErrorView(
@@ -236,31 +180,18 @@ class HomeScreen extends ConsumerWidget {
                 }
                 return SliverList.separated(
                   itemCount: page.items.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
                   itemBuilder: (context, i) {
                     final g = page.items[i];
                     return Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Card(
-                        child: ListTile(
-                          onTap: () => context.push('/app/games/${g.id}'),
-                          title: Text(
-                            g.stadium.name,
-                            style: const TextStyle(fontWeight: FontWeight.w800),
-                          ),
-                          subtitle: Text(
-                            '${formatDateShort(g.date)} · ${g.startTime} · ${g.format} · ${g.playersCount}/${g.maxPlayers}',
-                            style: const TextStyle(color: AppColors.muted, fontSize: 12),
-                          ),
-                          trailing: const Icon(Icons.chevron_right, color: AppColors.faint),
-                        ),
-                      ),
+                      child: _GameRow(game: g),
                     );
                   },
                 );
               },
             ),
-            const SliverToBoxAdapter(child: SizedBox(height: 28)),
+            const SliverToBoxAdapter(child: SizedBox(height: 32)),
           ],
         ),
       ),
@@ -268,50 +199,351 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
-class _MiniPillar extends StatelessWidget {
-  const _MiniPillar({
-    required this.title,
-    required this.subtitle,
+/// Full-bleed match-night hero — brand first, one CTA group.
+class _HomeHero extends StatefulWidget {
+  const _HomeHero({
+    required this.name,
+    required this.onWallet,
+    required this.onNotif,
+    required this.onBook,
+    required this.onPlay,
+    this.heroImageUrl,
+  });
+
+  final String name;
+  final String? heroImageUrl;
+  final VoidCallback onWallet;
+  final VoidCallback onNotif;
+  final VoidCallback onBook;
+  final VoidCallback onPlay;
+
+  @override
+  State<_HomeHero> createState() => _HomeHeroState();
+}
+
+class _HomeHeroState extends State<_HomeHero>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2400),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final top = MediaQuery.paddingOf(context).top;
+    final h = MediaQuery.sizeOf(context).height;
+    // First viewport composition (~78% screen)
+    final heroH = (h * 0.78).clamp(420.0, 620.0);
+
+    return SizedBox(
+      height: heroH,
+      width: double.infinity,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Full-bleed pitch / stadium
+          if (widget.heroImageUrl != null && widget.heroImageUrl!.isNotEmpty)
+            PcNetworkImage(url: widget.heroImageUrl!)
+          else
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Color(0xFF00A864),
+                    Color(0xFF041510),
+                    Color(0xFF02100C),
+                  ],
+                ),
+              ),
+            ),
+          // Atmosphere overlays
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0x66041510),
+                  Color(0x22041510),
+                  Color(0xE6041510),
+                ],
+                stops: [0, 0.35, 1],
+              ),
+            ),
+          ),
+          // Cyber Mint wash
+          AnimatedBuilder(
+            animation: _pulse,
+            builder: (context, _) {
+              final a = 0.10 + _pulse.value * 0.12;
+              return DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: const Alignment(0.65, -0.15),
+                    radius: 1.05,
+                    colors: [
+                      AppColors.primary.withValues(alpha: a),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+          // Top chrome
+          Positioned(
+            left: 8,
+            right: 8,
+            top: top + 4,
+            child: Row(
+              children: [
+                const Spacer(),
+                IconButton(
+                  onPressed: widget.onWallet,
+                  icon: const Icon(Icons.account_balance_wallet_outlined),
+                  color: Colors.white70,
+                ),
+                IconButton(
+                  onPressed: widget.onNotif,
+                  icon: const Icon(Icons.notifications_outlined),
+                  color: Colors.white70,
+                ),
+              ],
+            ),
+          ),
+          // Brand + copy + CTA — bottom third of hero
+          Positioned(
+            left: 20,
+            right: 20,
+            bottom: 28,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'PLAYZON',
+                  style: TextStyle(
+                    fontSize: 42,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 3.5,
+                    height: 1,
+                    color: AppColors.primary,
+                    shadows: [
+                      Shadow(
+                        color: Colors.black.withValues(alpha: 0.55),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  'Salom, ${widget.name}',
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    height: 1.15,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Maydon bron qiling yoki ochiq o‘yinga qo‘shiling.',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 14,
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: ElevatedButton(
+                        onPressed: widget.onBook,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: const Color(0xFF003D26),
+                          minimumSize: const Size.fromHeight(52),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: const Text(
+                          'Bron qilish',
+                          style: TextStyle(fontWeight: FontWeight.w900),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      flex: 2,
+                      child: OutlinedButton(
+                        onPressed: widget.onPlay,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          side: BorderSide(
+                            color: AppColors.primary.withValues(alpha: 0.65),
+                          ),
+                          minimumSize: const Size.fromHeight(52),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: const Text(
+                          'O‘yin',
+                          style: TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NavChip extends StatelessWidget {
+  const _NavChip({
     required this.icon,
-    required this.color,
+    required this.label,
     required this.onTap,
   });
 
-  final String title;
-  final String subtitle;
   final IconData icon;
-  final Color color;
+  final String label;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.edge),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: color.withValues(alpha: 0.25)),
-              ),
-              child: Icon(icon, color: color, size: 20),
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.edge),
             ),
-            const SizedBox(height: 10),
-            Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
-            const SizedBox(height: 2),
-            Text(subtitle, style: const TextStyle(color: AppColors.muted, fontSize: 12)),
-          ],
+            child: Column(
+              children: [
+                Icon(icon, color: AppColors.primary, size: 20),
+                const SizedBox(height: 6),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GameRow extends StatelessWidget {
+  const _GameRow({required this.game});
+  final Game game;
+
+  @override
+  Widget build(BuildContext context) {
+    final fill = game.maxPlayers == 0
+        ? 0.0
+        : (game.playersCount / game.maxPlayers).clamp(0.0, 1.0);
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: () => context.push('/app/games/${game.id}'),
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            gradient: const LinearGradient(
+              colors: [Color(0xFF163528), Color(0xFF0B1510)],
+            ),
+            border: Border.all(
+              color: AppColors.gold.withValues(alpha: 0.3),
+            ),
+          ),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: SizedBox(
+                  width: 52,
+                  height: 52,
+                  child: PcNetworkImage(url: game.stadium.imageUrl),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      game.stadium.name,
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '${formatDateShort(game.date)} · ${game.startTime} · ${game.format}',
+                      style: const TextStyle(
+                          color: AppColors.muted, fontSize: 12),
+                    ),
+                    const SizedBox(height: 6),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(99),
+                      child: LinearProgressIndicator(
+                        value: fill,
+                        minHeight: 4,
+                        backgroundColor: Colors.white12,
+                        color: AppColors.gold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '${game.playersCount}/${game.maxPlayers}',
+                style: const TextStyle(
+                  color: AppColors.gold,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -327,12 +559,12 @@ class _StadiumCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: () => context.push('/app/stadiums/${stadium.id}'),
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(18),
       child: Container(
-        width: 220,
+        width: 200,
         decoration: BoxDecoration(
           color: AppColors.surface,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(18),
           border: Border.all(color: AppColors.edge),
         ),
         clipBehavior: Clip.antiAlias,
@@ -344,20 +576,30 @@ class _StadiumCard extends StatelessWidget {
                 fit: StackFit.expand,
                 children: [
                   PcNetworkImage(url: stadium.imageUrl),
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Colors.transparent, Color(0xAA0B1510)],
+                      ),
+                    ),
+                  ),
                   if (badge != null)
                     Positioned(
                       top: 8,
                       left: 8,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: AppColors.primary,
+                          color: AppColors.gold,
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
                           badge!,
                           style: const TextStyle(
-                            color: Color(0xFF052E12),
+                            color: Color(0xFF1A1000),
                             fontWeight: FontWeight.w800,
                             fontSize: 11,
                           ),
@@ -368,7 +610,7 @@ class _StadiumCard extends StatelessWidget {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

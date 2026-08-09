@@ -1,49 +1,74 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../shared/widgets/widgets.dart';
+import 'football_nav/football_ambient.dart';
+import 'football_nav/football_nav_bar.dart';
+import 'football_nav/football_nav_controller.dart';
 
-class ShellScreen extends StatelessWidget {
+/// Bottom-nav selected index — Reels pauses when not visible.
+final shellTabIndexProvider =
+    NotifierProvider<ShellTabIndexNotifier, int>(ShellTabIndexNotifier.new);
+
+class ShellTabIndexNotifier extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void set(int index) => state = index;
+}
+
+class ShellScreen extends ConsumerWidget {
   const ShellScreen({super.key, required this.navigationShell});
 
   final StatefulNavigationShell navigationShell;
 
-  void _onTap(int index) {
-    navigationShell.goBranch(
-      index,
-      initialLocation: index == navigationShell.currentIndex,
-    );
+  Future<void> _onTap(BuildContext context, WidgetRef ref, int index) async {
+    final from = navigationShell.currentIndex;
+    final reduce = MediaQuery.disableAnimationsOf(context);
+
+    await ref.read(footballNavProvider.notifier).runTo(
+          from: from,
+          to: index,
+          reduceMotion: reduce,
+          go: () {
+            ref.read(shellTabIndexProvider.notifier).set(index);
+            navigationShell.goBranch(
+              index,
+              initialLocation: index == navigationShell.currentIndex,
+            );
+          },
+        );
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final idx = navigationShell.currentIndex;
+    if (ref.read(shellTabIndexProvider) != idx) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(shellTabIndexProvider.notifier).set(idx);
+      });
+    }
+
     return Scaffold(
-      body: navigationShell,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: navigationShell.currentIndex,
-        onDestinationSelected: _onTap,
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home, color: AppColors.primary),
-            label: 'Asosiy',
+      backgroundColor: AppColors.bg,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          FootballAmbientBackdrop(tabIndex: idx),
+          Column(
+            children: [
+              const OfflineBanner(),
+              Expanded(child: navigationShell),
+            ],
           ),
-          NavigationDestination(
-            icon: Icon(Icons.sports_soccer_outlined),
-            selectedIcon: Icon(Icons.sports_soccer, color: AppColors.primary),
-            label: 'O‘yinlar',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.movie_filter_outlined),
-            selectedIcon: Icon(Icons.movie_filter, color: AppColors.primary),
-            label: 'Lavhalar',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person, color: AppColors.primary),
-            label: 'Profil',
-          ),
+          const FootballFlyLayer(),
         ],
+      ),
+      bottomNavigationBar: FootballNavBar(
+        selectedIndex: navigationShell.currentIndex,
+        onSelect: (i) => _onTap(context, ref, i),
       ),
     );
   }

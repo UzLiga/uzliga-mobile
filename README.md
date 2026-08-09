@@ -17,9 +17,16 @@ API base: `lib/core/constants.dart` → `apiBase`.
 ## Build
 
 ```bash
+# Universal APK — barcha Android telefonlar (bitta fayl)
+flutter build apk --release
+
+# Yoki ABI bo‘yicha kichikroq fayllar
 flutter build apk --release --split-per-abi
 flutter build appbundle --release
 ```
+
+Yuklab olish (prod): https://playzon.asilbek.tech/download  
+To‘g‘ridan APK: https://playzon.asilbek.tech/Playzon.apk
 
 ## Org
 

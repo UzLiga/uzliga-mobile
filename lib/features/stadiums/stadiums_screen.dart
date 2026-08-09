@@ -1,28 +1,80 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/pc_app_bar.dart';
 import '../../shared/format.dart';
 import '../../shared/models/models.dart';
 import '../../shared/widgets/widgets.dart';
+import 'booking_wizard.dart';
 
-final stadiumsSearchProvider = NotifierProvider<StadiumsSearchNotifier, String>(
-  StadiumsSearchNotifier.new,
-);
+class StadiumsFilter {
+  const StadiumsFilter({
+    this.search = '',
+    this.district,
+    this.minPrice,
+    this.maxPrice,
+    this.sort = '-rating',
+  });
 
-class StadiumsSearchNotifier extends Notifier<String> {
-  @override
-  String build() => '';
+  final String search;
+  final String? district;
+  final int? minPrice;
+  final int? maxPrice;
+  final String sort;
 
-  void setQuery(String value) => state = value;
+  StadiumsFilter copyWith({
+    String? search,
+    String? district,
+    int? minPrice,
+    int? maxPrice,
+    String? sort,
+    bool clearDistrict = false,
+    bool clearPrices = false,
+  }) {
+    return StadiumsFilter(
+      search: search ?? this.search,
+      district: clearDistrict ? null : (district ?? this.district),
+      minPrice: clearPrices ? null : (minPrice ?? this.minPrice),
+      maxPrice: clearPrices ? null : (maxPrice ?? this.maxPrice),
+      sort: sort ?? this.sort,
+    );
+  }
 }
 
-final stadiumsProvider = FutureProvider.autoDispose((ref) {
-  final q = ref.watch(stadiumsSearchProvider);
-  return ref.watch(apiClientProvider).listStadiums(search: q, limit: 40, sort: '-rating');
+final stadiumsFilterProvider =
+    NotifierProvider<StadiumsFilterNotifier, StadiumsFilter>(
+  StadiumsFilterNotifier.new,
+);
+
+class StadiumsFilterNotifier extends Notifier<StadiumsFilter> {
+  @override
+  StadiumsFilter build() => const StadiumsFilter();
+
+  void setSearch(String v) => state = state.copyWith(search: v);
+  void setDistrict(String? d) =>
+      state = state.copyWith(district: d, clearDistrict: d == null);
+  void setPriceRange(int? min, int? max) =>
+      state = state.copyWith(minPrice: min, maxPrice: max, clearPrices: min == null && max == null);
+  void setSort(String s) => state = state.copyWith(sort: s);
+}
+
+final districtsProvider = FutureProvider((ref) {
+  return ref.watch(apiClientProvider).districts();
+});
+
+final stadiumsProvider = FutureProvider((ref) {
+  final f = ref.watch(stadiumsFilterProvider);
+  return ref.watch(apiClientProvider).listStadiums(
+        search: f.search,
+        district: f.district,
+        minPrice: f.minPrice,
+        maxPrice: f.maxPrice,
+        sort: f.sort,
+        limit: 24,
+      );
 });
 
 final stadiumDetailProvider =
@@ -33,25 +85,113 @@ final stadiumDetailProvider =
 class StadiumsScreen extends ConsumerWidget {
   const StadiumsScreen({super.key});
 
+  static const _pricePresets = <(String, int?, int?)>[
+    ('Hammasi', null, null),
+    ('< 100k', null, 100000),
+    ('100–200k', 100000, 200000),
+    ('200k+', 200000, null),
+  ];
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(stadiumsProvider);
+    final filter = ref.watch(stadiumsFilterProvider);
+    final districts = ref.watch(districtsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Stadionlar')),
+      appBar: pcAppBar(
+        context,
+        title: 'Stadionlar',
+        actions: [
+          IconButton(
+            tooltip: 'Xarita',
+            onPressed: () => context.push('/app/map'),
+            icon: const Icon(Icons.map_outlined),
+          ),
+          PopupMenuButton<String>(
+            tooltip: 'Saralash',
+            initialValue: filter.sort,
+            onSelected: (v) =>
+                ref.read(stadiumsFilterProvider.notifier).setSort(v),
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: '-rating', child: Text('Reyting')),
+              PopupMenuItem(value: 'price_per_hour', child: Text('Narx ↑')),
+              PopupMenuItem(value: '-price_per_hour', child: Text('Narx ↓')),
+              PopupMenuItem(value: 'name', child: Text('Nom')),
+            ],
+            icon: const Icon(Icons.sort),
+          ),
+        ],
+      ),
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
             child: TextField(
               onChanged: (v) =>
-                  ref.read(stadiumsSearchProvider.notifier).setQuery(v),
+                  ref.read(stadiumsFilterProvider.notifier).setSearch(v),
               decoration: const InputDecoration(
-                hintText: 'Qidirish...',
+                hintText: 'Stadion qidirish...',
                 prefixIcon: Icon(Icons.search),
               ),
             ),
           ),
+          SizedBox(
+            height: 40,
+            child: districts.when(
+              loading: () => const SizedBox.shrink(),
+              error: (_, __) => const SizedBox.shrink(),
+              data: (list) {
+                final chips = <String?>[null, ...list];
+                return ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: chips.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemBuilder: (context, i) {
+                    final d = chips[i];
+                    final selected = filter.district == d;
+                    return FilterChip(
+                      label: Text(d ?? 'Barcha tuman'),
+                      selected: selected,
+                      onSelected: (_) => ref
+                          .read(stadiumsFilterProvider.notifier)
+                          .setDistrict(d),
+                      selectedColor: AppColors.primary.withValues(alpha: 0.25),
+                      checkmarkColor: AppColors.primary,
+                      side: BorderSide(
+                        color: selected ? AppColors.primary : AppColors.edge,
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 36,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: _pricePresets.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (context, i) {
+                final p = _pricePresets[i];
+                final selected =
+                    filter.minPrice == p.$2 && filter.maxPrice == p.$3;
+                return ChoiceChip(
+                  label: Text(p.$1, style: const TextStyle(fontSize: 12)),
+                  selected: selected,
+                  onSelected: (_) => ref
+                      .read(stadiumsFilterProvider.notifier)
+                      .setPriceRange(p.$2, p.$3),
+                  selectedColor: AppColors.primary.withValues(alpha: 0.25),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 8),
           Expanded(
             child: async.when(
               loading: () => const LoadingView(),
@@ -61,65 +201,24 @@ class StadiumsScreen extends ConsumerWidget {
               ),
               data: (page) {
                 if (page.items.isEmpty) {
-                  return const EmptyState(title: 'Stadion topilmadi');
+                  return const EmptyState(
+                    title: 'Stadion topilmadi',
+                    subtitle: 'Filtrlarni o‘zgartiring',
+                  );
                 }
                 return RefreshIndicator(
                   color: AppColors.primary,
-                  onRefresh: () async => ref.invalidate(stadiumsProvider),
+                  onRefresh: () async {
+                    ref.invalidate(stadiumsProvider);
+                    ref.invalidate(districtsProvider);
+                  },
                   child: ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
                     itemCount: page.items.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
                     itemBuilder: (context, i) {
                       final s = page.items[i];
-                      return InkWell(
-                        onTap: () => context.push('/app/stadiums/${s.id}'),
-                        borderRadius: BorderRadius.circular(16),
-                        child: Card(
-                          clipBehavior: Clip.antiAlias,
-                          child: Row(
-                            children: [
-                              SizedBox(
-                                width: 96,
-                                height: 96,
-                                child: PcNetworkImage(url: s.imageUrl),
-                              ),
-                              Expanded(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(12),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        s.name,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(fontWeight: FontWeight.w800),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        '${s.district} · ${s.size}',
-                                        style: const TextStyle(
-                                          color: AppColors.muted,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Text(
-                                        formatPrice(s.pricePerHour),
-                                        style: const TextStyle(
-                                          color: AppColors.primary,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
+                      return _StadiumCard(stadium: s);
                     },
                   ),
                 );
@@ -132,120 +231,161 @@ class StadiumsScreen extends ConsumerWidget {
   }
 }
 
-class StadiumDetailScreen extends ConsumerStatefulWidget {
+class _StadiumCard extends StatelessWidget {
+  const _StadiumCard({required this.stadium});
+  final Stadium stadium;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => context.push('/app/stadiums/${stadium.id}'),
+        borderRadius: BorderRadius.circular(18),
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppColors.edge),
+            color: AppColors.surface,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ClipRRect(
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(17)),
+                child: AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      PcNetworkImage(url: stadium.imageUrl),
+                      Positioned(
+                        left: 10,
+                        bottom: 10,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.55),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            '⭐ ${stadium.rating.toStringAsFixed(1)}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        right: 10,
+                        bottom: 10,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.92),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            formatPrice(stadium.pricePerHour),
+                            style: const TextStyle(
+                              color: Color(0xFF052E12),
+                              fontWeight: FontWeight.w800,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      stadium.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${stadium.district} · ${stadium.size} · ${stadium.surface}',
+                      style: const TextStyle(
+                        color: AppColors.muted,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class StadiumDetailScreen extends ConsumerWidget {
   const StadiumDetailScreen({super.key, required this.stadiumId});
 
   final int stadiumId;
 
   @override
-  ConsumerState<StadiumDetailScreen> createState() => _StadiumDetailScreenState();
-}
-
-class _StadiumDetailScreenState extends ConsumerState<StadiumDetailScreen> {
-  DateTime _date = DateTime.now();
-  String? _slot;
-  int _duration = 1;
-  Availability? _availability;
-  bool _loadingSlots = false;
-  bool _booking = false;
-
-  @override
-  void initState() {
-    super.initState();
-    Future.microtask(_loadSlots);
-  }
-
-  String get _dateStr => DateFormat('yyyy-MM-dd').format(_date);
-
-  Future<void> _loadSlots() async {
-    setState(() {
-      _loadingSlots = true;
-      _slot = null;
-    });
-    try {
-      final a = await ref
-          .read(apiClientProvider)
-          .stadiumAvailability(widget.stadiumId, _dateStr);
-      if (mounted) {
-        setState(() {
-          _availability = a;
-          _loadingSlots = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _loadingSlots = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
-      }
-    }
-  }
-
-  Future<void> _pickDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _date,
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 60)),
-    );
-    if (picked != null) {
-      setState(() => _date = picked);
-      await _loadSlots();
-    }
-  }
-
-  Future<void> _book(Stadium stadium) async {
-    if (_slot == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vaqt tanlang')),
-      );
-      return;
-    }
-    setState(() => _booking = true);
-    try {
-      final booking = await ref.read(apiClientProvider).createBooking(
-            stadiumId: stadium.id,
-            date: _dateStr,
-            startTime: _slot!,
-            durationHours: _duration,
-          );
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Bron yaratildi · ${formatPrice(booking.totalPrice)}')),
-      );
-      context.push('/app/bookings');
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
-      }
-    } finally {
-      if (mounted) setState(() => _booking = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final async = ref.watch(stadiumDetailProvider(widget.stadiumId));
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(stadiumDetailProvider(stadiumId));
 
     return Scaffold(
+      floatingActionButtonLocation: FloatingActionButtonLocation.startTop,
+      floatingActionButton: async.hasValue ? const PcBackChip() : null,
       body: async.when(
+        skipLoadingOnReload: true,
+        skipLoadingOnRefresh: true,
         loading: () => const LoadingView(),
         error: (e, _) => ErrorView(
           message: e.toString(),
-          onRetry: () => ref.invalidate(stadiumDetailProvider(widget.stadiumId)),
+          onRetry: () => ref.invalidate(stadiumDetailProvider(stadiumId)),
         ),
         data: (stadium) {
-          final slots = _availability?.slots ?? const <AvailabilitySlot>[];
+          final depositHint =
+              stadium.depositFor(stadium.pricePerHour);
           return CustomScrollView(
             slivers: [
               SliverAppBar(
-                expandedHeight: 220,
+                expandedHeight: 240,
                 pinned: true,
+                automaticallyImplyLeading: false,
                 flexibleSpace: FlexibleSpaceBar(
                   title: Text(
                     stadium.name,
-                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w800, fontSize: 16),
                   ),
-                  background: PcNetworkImage(url: stadium.imageUrl),
+                  background: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      PcNetworkImage(url: stadium.imageUrl),
+                      const DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [Colors.transparent, Color(0xCC0B1510)],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               SliverToBoxAdapter(
@@ -255,20 +395,12 @@ class _StadiumDetailScreenState extends ConsumerState<StadiumDetailScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '${stadium.district} · ⭐ ${stadium.rating.toStringAsFixed(1)} (${stadium.reviewsCount})',
+                        '${stadium.district} · ${formatPrice(stadium.pricePerHour)}/soat',
                         style: const TextStyle(color: AppColors.muted),
                       ),
                       const SizedBox(height: 8),
-                      Text(
-                        '${formatPrice(stadium.pricePerHour)} / soat',
-                        style: const TextStyle(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 18,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(stadium.address, style: const TextStyle(color: AppColors.muted)),
+                      Text(stadium.address,
+                          style: const TextStyle(color: AppColors.muted)),
                       if (stadium.description.isNotEmpty) ...[
                         const SizedBox(height: 12),
                         Text(stadium.description),
@@ -282,72 +414,52 @@ class _StadiumDetailScreenState extends ConsumerState<StadiumDetailScreen> {
                           _Chip(label: stadium.size),
                           if (stadium.hasShower) const _Chip(label: 'Dush'),
                           if (stadium.hasParking) const _Chip(label: 'Parking'),
-                          if (stadium.hasLighting) const _Chip(label: 'Yoritish'),
+                          if (stadium.hasLighting)
+                            const _Chip(label: 'Yoritish'),
                         ],
                       ),
                       const SizedBox(height: 24),
-                      const Text('Bron qilish', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-                      const SizedBox(height: 12),
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text('Sana'),
-                        subtitle: Text(_dateStr),
-                        trailing: const Icon(Icons.calendar_today),
-                        onTap: _pickDate,
-                      ),
-                      const SizedBox(height: 8),
-                      const Text('Davomiylik', style: TextStyle(fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        children: [1, 2, 3].map((h) {
-                          final selected = _duration == h;
-                          return ChoiceChip(
-                            label: Text('$h soat'),
-                            selected: selected,
-                            onSelected: (_) => setState(() => _duration = h),
-                            selectedColor: AppColors.primary.withValues(alpha: 0.25),
-                          );
-                        }).toList(),
-                      ),
-                      const SizedBox(height: 16),
-                      const Text('Vaqt', style: TextStyle(fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 8),
-                      if (_loadingSlots)
-                        const Padding(
-                          padding: EdgeInsets.all(16),
-                          child: LoadingView(),
-                        )
-                      else if (slots.isEmpty)
-                        const Text('Bo‘sh slot yo‘q', style: TextStyle(color: AppColors.muted))
-                      else
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: slots.map((s) {
-                            final selected = _slot == s.startTime;
-                            return ChoiceChip(
-                              label: Text(s.startTime),
-                              selected: selected,
-                              onSelected: !s.available
-                                  ? null
-                                  : (_) => setState(() => _slot = s.startTime),
-                              selectedColor: AppColors.primary.withValues(alpha: 0.25),
-                            );
-                          }).toList(),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20),
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF1A2A1F), Color(0xFF0B1510)],
+                          ),
+                          border: Border.all(
+                            color: const Color(0xFFE8B923)
+                                .withValues(alpha: 0.4),
+                          ),
                         ),
-                      const SizedBox(height: 20),
-                      ElevatedButton(
-                        onPressed: _booking ? null : () => _book(stadium),
-                        child: _booking
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : Text(
-                                'Bron qilish · ${formatPrice(stadium.pricePerHour * _duration)}',
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Bron qilish',
+                              style: TextStyle(
+                                  fontSize: 18, fontWeight: FontWeight.w900),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Sana va vaqtni tanlang, zakalat bilan bron ochiladi.\n'
+                              'Zakalat taxminan ${formatPrice(depositHint)} / soat',
+                              style: const TextStyle(
+                                  color: AppColors.muted, fontSize: 13),
+                            ),
+                            const SizedBox(height: 14),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed: () => openBookingWizard(
+                                  context,
+                                  stadium: stadium,
+                                ),
+                                icon: const Icon(Icons.event_available),
+                                label: const Text('Bron qilish'),
                               ),
+                            ),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 32),
                     ],
@@ -375,7 +487,8 @@ class _Chip extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: AppColors.edge),
       ),
-      child: Text(label, style: const TextStyle(fontSize: 12, color: AppColors.muted)),
+      child: Text(label, style: const TextStyle(fontSize: 12)),
     );
   }
 }
+

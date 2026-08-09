@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/pc_app_bar.dart';
 import '../../shared/models/models.dart';
 import '../../shared/widgets/widgets.dart';
 import '../auth/auth_provider.dart';
@@ -29,7 +30,9 @@ class _FreeAgentsScreenState extends ConsumerState<FreeAgentsScreen> {
     final me = ref.watch(authProvider).user;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Sherik izlash')),
+      appBar: pcAppBar(
+        context,
+        title: 'Sherik izlash',),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showCreateSheet(context),
         backgroundColor: AppColors.primary,
