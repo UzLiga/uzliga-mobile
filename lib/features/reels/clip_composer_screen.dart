@@ -64,9 +64,14 @@ class _ClipComposerScreenState extends ConsumerState<ClipComposerScreen>
   String? _momentId;
   String? _trackId;
   final _caption = TextEditingController();
-  int _step = 0; // 0 pick, 1 moment, 2 caption/sound, 3 publish
+  int _step = 0; // 0 pick → 1 moment → 2 editor → 3 caption → 4 publish
   bool _uploading = false;
   double _progress = 0;
+  Duration _trimStart = Duration.zero;
+  Duration _trimEnd = Duration.zero;
+  String? _overlay; // scoreboard | goal | match | sticker | effect
+  String _customText = 'GOAL!';
+  String? _sticker;
   late final AnimationController _lights;
 
   @override
@@ -82,8 +87,17 @@ class _ClipComposerScreenState extends ConsumerState<ClipComposerScreen>
   void dispose() {
     _lights.dispose();
     _caption.dispose();
+    _player?.removeListener(_onTick);
     _player?.dispose();
     super.dispose();
+  }
+
+  void _onTick() {
+    final p = _player;
+    if (p == null || !p.value.isInitialized) return;
+    if (p.value.position >= _trimEnd && _trimEnd > _trimStart) {
+      p.seekTo(_trimStart);
+    }
   }
 
   Future<void> _pick(ImageSource source) async {
@@ -95,11 +109,14 @@ class _ClipComposerScreenState extends ConsumerState<ClipComposerScreen>
     await _player?.dispose();
     final ctrl = VideoPlayerController.file(File(file.path));
     await ctrl.initialize();
-    ctrl.setLooping(true);
+    ctrl.setLooping(false);
     await ctrl.play();
+    ctrl.addListener(_onTick);
     setState(() {
       _file = file;
       _player = ctrl;
+      _trimStart = Duration.zero;
+      _trimEnd = ctrl.value.duration;
       _step = 1;
     });
     HapticFeedback.mediumImpact();
@@ -123,16 +140,24 @@ class _ClipComposerScreenState extends ConsumerState<ClipComposerScreen>
     } else {
       buf.writeln('#football #matchday');
     }
+    if (_overlay == 'goal' || _customText.trim().isNotEmpty && _overlay == 'match') {
+      buf.writeln(_customText.trim());
+    }
+    if (_sticker != null) buf.writeln(_sticker);
     if (track != null) buf.writeln('🎵 ${track.title}');
+    final sec = (_trimEnd - _trimStart).inSeconds;
+    if (sec > 0 && sec < (_player?.value.duration.inSeconds ?? 999)) {
+      buf.writeln('✂️ ${sec}s highlight');
+    }
     return buf.toString().trim();
   }
 
   Future<void> _publish() async {
     if (_file == null || _uploading) return;
-    setState(() {
+      setState(() {
       _uploading = true;
       _progress = 0.08;
-      _step = 3;
+      _step = 4;
     });
     // Smooth fake progress while network upload runs
     var tick = 0;
@@ -167,7 +192,7 @@ class _ClipComposerScreenState extends ConsumerState<ClipComposerScreen>
       if (!mounted) return;
       setState(() {
         _uploading = false;
-        _step = 2;
+        _step = 3;
       });
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
     }
@@ -179,13 +204,13 @@ class _ClipComposerScreenState extends ConsumerState<ClipComposerScreen>
       backgroundColor: const Color(0xFF050807),
       appBar: pcAppBar(
         context,
-        title: _step == 0
-            ? 'Match Moment'
-            : _step == 1
-                ? 'Nima bo‘ldi?'
-                : _step == 2
-                    ? 'Tahrirlash'
-                    : 'Yuklash',
+        title: switch (_step) {
+          0 => 'Match Moment',
+          1 => 'Nima bo‘ldi?',
+          2 => 'Editor',
+          3 => 'Caption',
+          _ => 'Yuklash',
+        },
       ),
       body: Stack(
         fit: StackFit.expand,
@@ -214,18 +239,42 @@ class _ClipComposerScreenState extends ConsumerState<ClipComposerScreen>
                     },
                     onBack: () => setState(() => _step = 0),
                   ),
-                2 => _CaptionStep(
+                2 => _EditorStep(
                     key: const ValueKey(2),
+                    player: _player,
+                    trimStart: _trimStart,
+                    trimEnd: _trimEnd,
+                    overlay: _overlay,
+                    customText: _customText,
+                    sticker: _sticker,
+                    onTrim: (a, b) => setState(() {
+                      _trimStart = a;
+                      _trimEnd = b;
+                    }),
+                    onOverlay: (v) => setState(() => _overlay = v),
+                    onText: (v) => setState(() => _customText = v),
+                    onSticker: (v) => setState(() => _sticker = v),
+                    onBack: () => setState(() => _step = 1),
+                    onNext: () {
+                      _player?.seekTo(_trimStart);
+                      setState(() => _step = 3);
+                    },
+                  ),
+                3 => _CaptionStep(
+                    key: const ValueKey(3),
                     player: _player,
                     caption: _caption,
                     tracks: _tracks,
                     trackId: _trackId,
+                    overlay: _overlay,
+                    customText: _customText,
+                    sticker: _sticker,
                     onTrack: (id) => setState(() => _trackId = id),
-                    onBack: () => setState(() => _step = 1),
+                    onBack: () => setState(() => _step = 2),
                     onPublish: _publish,
                   ),
                 _ => _UploadStep(
-                    key: const ValueKey(3),
+                    key: const ValueKey(4),
                     progress: _progress,
                     done: _progress >= 1,
                   ),
@@ -499,6 +548,275 @@ class _MomentStep extends StatelessWidget {
   }
 }
 
+class _EditorStep extends StatelessWidget {
+  const _EditorStep({
+    super.key,
+    required this.player,
+    required this.trimStart,
+    required this.trimEnd,
+    required this.overlay,
+    required this.customText,
+    required this.sticker,
+    required this.onTrim,
+    required this.onOverlay,
+    required this.onText,
+    required this.onSticker,
+    required this.onBack,
+    required this.onNext,
+  });
+
+  final VideoPlayerController? player;
+  final Duration trimStart;
+  final Duration trimEnd;
+  final String? overlay;
+  final String customText;
+  final String? sticker;
+  final void Function(Duration start, Duration end) onTrim;
+  final ValueChanged<String?> onOverlay;
+  final ValueChanged<String> onText;
+  final ValueChanged<String?> onSticker;
+  final VoidCallback onBack;
+  final VoidCallback onNext;
+
+  @override
+  Widget build(BuildContext context) {
+    final dur = player?.value.duration ?? Duration.zero;
+    final maxMs = dur.inMilliseconds.clamp(1, 999999999).toDouble();
+    final start = trimStart.inMilliseconds.clamp(0, maxMs.toInt()).toDouble();
+    final end = trimEnd.inMilliseconds.clamp(0, maxMs.toInt()).toDouble();
+
+    return Column(
+      children: [
+        Expanded(
+          child: _BroadcastPreview(
+            player: player,
+            label: 'EDITOR',
+            overlay: overlay,
+            customText: customText,
+            sticker: sticker,
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '✂️ Trim  ·  ${(end - start) ~/ 1000}s',
+                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+              ),
+              RangeSlider(
+                values: RangeValues(
+                  start.clamp(0, maxMs),
+                  end.clamp(0, maxMs),
+                ),
+                min: 0,
+                max: maxMs,
+                activeColor: AppColors.lime,
+                inactiveColor: Colors.white24,
+                onChanged: (v) {
+                  var a = Duration(milliseconds: v.start.round());
+                  var b = Duration(milliseconds: v.end.round());
+                  if (b - a < const Duration(seconds: 1)) {
+                    b = a + const Duration(seconds: 1);
+                    if (b > dur) {
+                      b = dur;
+                      a = b - const Duration(seconds: 1);
+                      if (a < Duration.zero) a = Duration.zero;
+                    }
+                  }
+                  onTrim(a, b);
+                  player?.seekTo(a);
+                },
+              ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 56,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            children: [
+              _ToolChip(
+                icon: '🏆',
+                label: 'Score',
+                on: overlay == 'scoreboard',
+                onTap: () => onOverlay(
+                    overlay == 'scoreboard' ? null : 'scoreboard'),
+              ),
+              _ToolChip(
+                icon: '⚽',
+                label: 'Goal',
+                on: overlay == 'goal',
+                onTap: () {
+                  onOverlay(overlay == 'goal' ? null : 'goal');
+                  onText('GOAL!');
+                },
+              ),
+              _ToolChip(
+                icon: 'Aa',
+                label: 'Text',
+                on: overlay == 'match',
+                onTap: () async {
+                  onOverlay('match');
+                  final ctrl = TextEditingController(text: customText);
+                  final ok = await showModalBottomSheet<String>(
+                    context: context,
+                    backgroundColor: const Color(0xFF0D1711),
+                    builder: (ctx) => Padding(
+                      padding: EdgeInsets.only(
+                        left: 16,
+                        right: 16,
+                        top: 16,
+                        bottom: MediaQuery.paddingOf(ctx).bottom + 16,
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('Custom text',
+                              style: TextStyle(fontWeight: FontWeight.w800)),
+                          const SizedBox(height: 10),
+                          TextField(controller: ctrl, autofocus: true),
+                          const SizedBox(height: 12),
+                          FilledButton(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: AppColors.lime,
+                              foregroundColor: const Color(0xFF052E12),
+                            ),
+                            onPressed: () => Navigator.pop(ctx, ctrl.text),
+                            child: const Text('Qo‘llash'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                  if (ok != null) onText(ok);
+                },
+              ),
+              _ToolChip(
+                icon: '🔥',
+                label: 'Sticker',
+                on: sticker != null,
+                onTap: () {
+                  const opts = ['⚽', '🔥', '⚡', '💥', '🏆', '🧤', 'GOOOAL'];
+                  showModalBottomSheet<void>(
+                    context: context,
+                    backgroundColor: const Color(0xFF0D1711),
+                    builder: (ctx) => Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: [
+                          for (final s in opts)
+                            ActionChip(
+                              label: Text(s, style: const TextStyle(fontSize: 20)),
+                              onPressed: () {
+                                onSticker(s);
+                                Navigator.pop(ctx);
+                              },
+                            ),
+                          TextButton(
+                            onPressed: () {
+                              onSticker(null);
+                              Navigator.pop(ctx);
+                            },
+                            child: const Text('Olib tashlash'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+              _ToolChip(
+                icon: '✨',
+                label: 'Effect',
+                on: overlay == 'effect',
+                onTap: () =>
+                    onOverlay(overlay == 'effect' ? null : 'effect'),
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+          child: Row(
+            children: [
+              TextButton(onPressed: onBack, child: const Text('Orqaga')),
+              const Spacer(),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.lime,
+                  foregroundColor: const Color(0xFF052E12),
+                ),
+                onPressed: onNext,
+                child: const Text('Next →'),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ToolChip extends StatelessWidget {
+  const _ToolChip({
+    required this.icon,
+    required this.label,
+    required this.on,
+    required this.onTap,
+  });
+  final String icon;
+  final String label;
+  final bool on;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: Material(
+        color: on
+            ? AppColors.lime.withValues(alpha: 0.16)
+            : const Color(0xFF0D1711),
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            constraints: const BoxConstraints(minWidth: 64, minHeight: 48),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: on
+                    ? AppColors.lime
+                    : Colors.white.withValues(alpha: 0.1),
+              ),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(icon, style: const TextStyle(fontSize: 14)),
+                Text(label,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      color: on ? AppColors.lime : AppColors.ink,
+                    )),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _CaptionStep extends StatelessWidget {
   const _CaptionStep({
     super.key,
@@ -506,6 +824,9 @@ class _CaptionStep extends StatelessWidget {
     required this.caption,
     required this.tracks,
     required this.trackId,
+    required this.overlay,
+    required this.customText,
+    required this.sticker,
     required this.onTrack,
     required this.onBack,
     required this.onPublish,
@@ -515,6 +836,9 @@ class _CaptionStep extends StatelessWidget {
   final TextEditingController caption;
   final List<_Track> tracks;
   final String? trackId;
+  final String? overlay;
+  final String customText;
+  final String? sticker;
   final ValueChanged<String> onTrack;
   final VoidCallback onBack;
   final VoidCallback onPublish;
@@ -526,7 +850,13 @@ class _CaptionStep extends StatelessWidget {
       children: [
         SizedBox(
           height: 260,
-          child: _BroadcastPreview(player: player, label: 'PREVIEW'),
+          child: _BroadcastPreview(
+            player: player,
+            label: 'PREVIEW',
+            overlay: overlay,
+            customText: customText,
+            sticker: sticker,
+          ),
         ),
         const SizedBox(height: 16),
         const Text('Caption',
@@ -660,9 +990,18 @@ class _UploadStep extends StatelessWidget {
 }
 
 class _BroadcastPreview extends StatelessWidget {
-  const _BroadcastPreview({required this.player, required this.label});
+  const _BroadcastPreview({
+    required this.player,
+    required this.label,
+    this.overlay,
+    this.customText = '',
+    this.sticker,
+  });
   final VideoPlayerController? player;
   final String label;
+  final String? overlay;
+  final String customText;
+  final String? sticker;
 
   @override
   Widget build(BuildContext context) {
@@ -697,8 +1036,11 @@ class _BroadcastPreview extends StatelessWidget {
                 ],
               ),
               clipBehavior: Clip.antiAlias,
-              child: ready
-                  ? FittedBox(
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (ready)
+                    FittedBox(
                       fit: BoxFit.cover,
                       child: SizedBox(
                         width: player!.value.size.width,
@@ -706,12 +1048,86 @@ class _BroadcastPreview extends StatelessWidget {
                         child: VideoPlayer(player!),
                       ),
                     )
-                  : Container(
+                  else
+                    Container(
                       color: const Color(0xFF0D1711),
                       alignment: Alignment.center,
                       child: const Icon(Icons.videocam_outlined,
                           color: AppColors.muted, size: 40),
                     ),
+                  if (overlay == 'effect')
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: RadialGradient(
+                          colors: [
+                            AppColors.lime.withValues(alpha: 0.28),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
+                    ),
+                  if (overlay == 'scoreboard')
+                    Positioned(
+                      top: 12,
+                      left: 12,
+                      right: 12,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.72),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                              color: AppColors.lime.withValues(alpha: 0.5)),
+                        ),
+                        child: const Text(
+                          'TEAM A    2 : 1    TEAM B',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1.2,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (overlay == 'goal' || overlay == 'match')
+                    Align(
+                      alignment: const Alignment(0, 0.55),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.65),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.lime),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.lime.withValues(alpha: 0.35),
+                              blurRadius: 16,
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          customText.isEmpty ? 'GOAL!' : customText,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 22,
+                            letterSpacing: 1.4,
+                            color: AppColors.lime,
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (sticker != null)
+                    Positioned(
+                      right: 16,
+                      bottom: 18,
+                      child: Text(sticker!,
+                          style: const TextStyle(fontSize: 36)),
+                    ),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 8),

@@ -76,6 +76,8 @@ class ProfileScreen extends ConsumerWidget {
                         const SizedBox(height: 16),
                         _PerformanceGrid(user: user),
                         const SizedBox(height: 16),
+                        _MyPositionSection(user: user),
+                        const SizedBox(height: 16),
                         _Achievements(user: user),
                         const SizedBox(height: 16),
                         if (user.referralCode != null &&
@@ -232,11 +234,12 @@ class ProfileScreen extends ConsumerWidget {
                                 Row(
                                   children: [
                                     const Expanded(
-                                      child: _SectionTitle(title: 'Mening reels'),
+                                      child: _SectionTitle(
+                                          title: '🎬 MY FOOTBALL MOMENTS'),
                                     ),
                                     TextButton.icon(
                                       onPressed: () =>
-                                          context.push('/app/my-reels'),
+                                          context.push('/app/clip-composer'),
                                       icon: const Icon(Icons.add_circle_outline,
                                           size: 18),
                                       label: const Text('Yuklash'),
@@ -248,9 +251,9 @@ class ProfileScreen extends ConsumerWidget {
                                     padding: const EdgeInsets.only(bottom: 16),
                                     child: OutlinedButton.icon(
                                       onPressed: () =>
-                                          context.push('/app/my-reels'),
-                                      icon: const Icon(Icons.video_call_outlined),
-                                      label: const Text('Birinchi lavhani yuklash'),
+                                          context.push('/app/clip-composer'),
+                                      icon: const Icon(Icons.sports_soccer),
+                                      label: const Text('Match Moment yaratish'),
                                     ),
                                   )
                                 else ...[
@@ -264,7 +267,7 @@ class ProfileScreen extends ConsumerWidget {
                                       crossAxisCount: 3,
                                       mainAxisSpacing: 6,
                                       crossAxisSpacing: 6,
-                                      childAspectRatio: 3 / 4,
+                                      childAspectRatio: 9 / 16,
                                     ),
                                     itemBuilder: (context, i) {
                                       final c = page.items[i];
@@ -275,7 +278,7 @@ class ProfileScreen extends ConsumerWidget {
                                             context.push('/app/my-reels'),
                                         child: ClipRRect(
                                           borderRadius:
-                                              BorderRadius.circular(12),
+                                              BorderRadius.circular(14),
                                           child: PcNetworkImage(url: thumb),
                                         ),
                                       );
@@ -938,8 +941,12 @@ class _CareerBack extends StatelessWidget {
               const Icon(Icons.military_tech, color: Color(0xFFE8B923), size: 20),
               const SizedBox(width: 8),
               const Text(
-                'Karyera',
-                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
+                'CAREER',
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 13,
+                  letterSpacing: 1.6,
+                ),
               ),
               const Spacer(),
               Container(
@@ -950,10 +957,11 @@ class _CareerBack extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  'Lv ${user.careerLevel}',
+                  'LEVEL ${user.careerLevel}',
                   style: const TextStyle(
                     color: Color(0xFFE8B923),
                     fontWeight: FontWeight.w900,
+                    letterSpacing: 0.8,
                   ),
                 ),
               ),
@@ -1107,6 +1115,50 @@ class _CareerStat extends StatelessWidget {
   }
 }
 
+class _MyPositionSection extends StatelessWidget {
+  const _MyPositionSection({required this.user});
+  final User user;
+
+  String get _pos {
+    final p = (user.position ?? 'CM').toUpperCase();
+    if (p.length <= 3) return p;
+    if (p.contains('DARVOZA') || p.contains('GK')) return 'GK';
+    if (p.contains('HIMOY')) return 'CB';
+    if (p.contains('YARIM')) return 'CM';
+    if (p.contains('HUJUM')) return 'ST';
+    return 'CM';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          '⚽ MY POSITION',
+          style: TextStyle(
+            fontWeight: FontWeight.w900,
+            fontSize: 13,
+            letterSpacing: 1.4,
+            color: AppColors.lime,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Primary position · $_pos',
+          style: const TextStyle(color: AppColors.muted, fontSize: 12),
+        ),
+        const SizedBox(height: 10),
+        PitchFormation.fromUsers(
+          players: [user],
+          formatSize: 7,
+          onPlayerTap: (_) {},
+        ),
+      ],
+    );
+  }
+}
+
 class _Achievements extends StatelessWidget {
   const _Achievements({required this.user});
   final User user;
@@ -1126,54 +1178,74 @@ class _Achievements extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _SectionTitle(title: 'Yutuqlar'),
-        const SizedBox(height: 8),
+        const Text(
+          '🏆 ACHIEVEMENTS',
+          style: TextStyle(
+            fontWeight: FontWeight.w900,
+            fontSize: 13,
+            letterSpacing: 1.4,
+            color: AppColors.gold,
+          ),
+        ),
+        const SizedBox(height: 10),
         Row(
           children: items
               .map(
                 (a) => Expanded(
                   child: Container(
                     margin: const EdgeInsets.symmetric(horizontal: 3),
-                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 14, horizontal: 6),
                     decoration: BoxDecoration(
                       color: a.got
-                          ? AppColors.primary.withValues(alpha: 0.12)
-                          : AppColors.surface,
-                      borderRadius: BorderRadius.circular(14),
+                          ? AppColors.lime.withValues(alpha: 0.1)
+                          : const Color(0xFF0A120D),
+                      borderRadius: BorderRadius.circular(16),
                       border: Border.all(
                         color: a.got
-                            ? AppColors.primary.withValues(alpha: 0.45)
-                            : AppColors.edge,
+                            ? AppColors.lime.withValues(alpha: 0.55)
+                            : AppColors.edge.withValues(alpha: 0.6),
                       ),
+                      boxShadow: a.got
+                          ? [
+                              BoxShadow(
+                                color: AppColors.lime.withValues(alpha: 0.18),
+                                blurRadius: 12,
+                              ),
+                            ]
+                          : null,
                     ),
-                    child: Column(
-                      children: [
-                        Icon(
-                          a.icon,
-                          size: 22,
-                          color: a.got ? AppColors.primary : AppColors.faint,
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          a.label,
-                          textAlign: TextAlign.center,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: a.got ? AppColors.ink : AppColors.faint,
+                    child: Opacity(
+                      opacity: a.got ? 1 : 0.45,
+                      child: Column(
+                        children: [
+                          Icon(
+                            a.got ? a.icon : Icons.lock_outline,
+                            size: 22,
+                            color: a.got ? AppColors.lime : AppColors.faint,
                           ),
-                        ),
-                        Text(
-                          a.sub,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 9,
-                            color: a.got ? AppColors.muted : AppColors.faint,
+                          const SizedBox(height: 6),
+                          Text(
+                            a.label,
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: a.got ? AppColors.ink : AppColors.faint,
+                            ),
                           ),
-                        ),
-                      ],
+                          Text(
+                            a.sub,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 9,
+                              color: a.got ? AppColors.muted : AppColors.faint,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
