@@ -21,6 +21,9 @@ class FootballAmbientBackdrop extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     if (!_visible) return const SizedBox.shrink();
 
+    final phase = ref.watch(
+      footballNavProvider.select((t) => t?.phase),
+    );
     final pose = ref.watch(
       footballNavProvider.select((t) {
         if (t == null) return FootballPlayerPose.idle;
@@ -44,9 +47,9 @@ class FootballAmbientBackdrop extends ConsumerWidget {
       _ => Alignment.centerRight, // home
     };
     final opacity = switch (tabIndex) {
-      1 => 0.72,
-      3 => 0.65,
-      _ => 0.85,
+      1 => 0.78,
+      3 => 0.72,
+      _ => 0.92,
     };
     final scale = switch (tabIndex) {
       1 => 1.2,
@@ -58,7 +61,6 @@ class FootballAmbientBackdrop extends ConsumerWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // Cyber Mint atmosphere
           const DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -78,48 +80,16 @@ class FootballAmbientBackdrop extends ConsumerWidget {
                 center: const Alignment(0.75, -0.1),
                 radius: 1.15,
                 colors: [
-                  AppColors.primary.withValues(alpha: 0.28),
-                  AppColors.primary.withValues(alpha: 0.08),
+                  AppColors.primary.withValues(alpha: 0.16),
+                  AppColors.primary.withValues(alpha: 0.05),
                   Colors.transparent,
                 ],
                 stops: const [0, 0.35, 1],
               ),
             ),
           ),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: RadialGradient(
-                center: const Alignment(-0.85, 0.9),
-                radius: 0.9,
-                colors: [
-                  AppColors.primaryDark.withValues(alpha: 0.22),
-                  Colors.transparent,
-                ],
-              ),
-            ),
-          ),
-          // Soft grid / tech lines
           CustomPaint(painter: _MintGridPainter()),
-          // Mint plate behind player (Cyber Mint wash)
-          Align(
-            alignment: align,
-            child: Container(
-              width: size.width * 0.72,
-              height: size.height * 0.78,
-              decoration: BoxDecoration(
-                gradient: RadialGradient(
-                  center: Alignment.center,
-                  radius: 0.85,
-                  colors: [
-                    AppColors.primary.withValues(alpha: 0.35),
-                    AppColors.primary.withValues(alpha: 0.08),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-          ),
-          // Player
+          // Player — oq fon yo‘q, toza cutout
           Align(
             alignment: align,
             child: Opacity(
@@ -132,13 +102,13 @@ class FootballAmbientBackdrop extends ConsumerWidget {
                   child: FootballPlayer(
                     height: playerH,
                     pose: pose,
-                    showBall: pose != FootballPlayerPose.kick,
+                    showBall: phase == FootballNavPhase.kick ||
+                        phase == FootballNavPhase.receive,
                   ),
                 ),
               ),
             ),
           ),
-          // Readability scrim over left content zone
           DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -153,7 +123,6 @@ class FootballAmbientBackdrop extends ConsumerWidget {
               ),
             ),
           ),
-          // Bottom fade into nav
           DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(

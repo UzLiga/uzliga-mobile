@@ -123,56 +123,66 @@ class _TabHitState extends State<_TabHit> {
               duration: const Duration(milliseconds: 220),
               curve: Curves.easeOutCubic,
               padding: EdgeInsets.symmetric(
-                horizontal: on ? 12 : 8,
-                vertical: 8,
+                horizontal: on ? 10 : 8,
+                vertical: on ? 6 : 8,
               ),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(22),
-                gradient: on
-                    ? const LinearGradient(
-                        colors: [Color(0xFF00CC7A), Color(0xFF00E0A0)],
-                      )
-                    : null,
-                color: on ? null : Colors.transparent,
-                boxShadow: on
-                    ? [
-                        BoxShadow(
-                          color: AppColors.primary.withValues(alpha: 0.35),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
-                        ),
-                      ]
-                    : null,
-              ),
+              decoration: const BoxDecoration(color: Colors.transparent),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Ball ring around icon (inactive) / solid mint pill (active)
-                  Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      if (!on)
+                  // Active = to‘p fon (yashil pill emas); inactive = yengil to‘p
+                  SizedBox(
+                    width: on ? 46 : 36,
+                    height: on ? 46 : 36,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      clipBehavior: Clip.none,
+                      children: [
                         Opacity(
-                          opacity: 0.55,
-                          child: FootballBall(size: 34, glow: false),
+                          opacity: on ? 1 : 0.5,
+                          child: FootballBall(
+                            size: on ? 44 : 34,
+                            glow: on,
+                            selected: on,
+                          ),
                         ),
-                      Icon(
-                        widget.icon,
-                        size: 22,
-                        color: on
-                            ? const Color(0xFF003D26)
-                            : Colors.white.withValues(alpha: 0.9),
-                      ),
-                    ],
+                        // Icon o‘qilishi uchun to‘p ustida yengil soyali
+                        if (on)
+                          Container(
+                            width: 28,
+                            height: 28,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.black.withValues(alpha: 0.28),
+                            ),
+                          ),
+                        Icon(
+                          widget.icon,
+                          size: on ? 20 : 22,
+                          color: Colors.white.withValues(alpha: on ? 1 : 0.9),
+                          shadows: on
+                              ? const [
+                                  Shadow(
+                                    color: Color(0x99000000),
+                                    blurRadius: 6,
+                                  ),
+                                ]
+                              : null,
+                        ),
+                      ],
+                    ),
                   ),
                   if (on) ...[
                     const SizedBox(height: 2),
                     Text(
                       widget.label,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w800,
-                        color: Color(0xFF003D26),
+                        color: Colors.white.withValues(alpha: 0.95),
+                        shadows: const [
+                          Shadow(color: Color(0x99000000), blurRadius: 4),
+                        ],
                       ),
                     ),
                   ],
@@ -282,6 +292,9 @@ class FootballHomeStage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final phase = ref.watch(
+      footballNavProvider.select((t) => t?.phase),
+    );
     final pose = ref.watch(
       footballNavProvider.select((t) {
         if (t == null) return FootballPlayerPose.idle;
@@ -298,7 +311,9 @@ class FootballHomeStage extends ConsumerWidget {
     return FootballPlayer(
       height: height,
       pose: pose,
-      showBall: pose != FootballPlayerPose.kick,
+      // Idle rasmdagi to‘p yetarli; kickda oyog‘iga tegish uchun overlay.
+      showBall: phase == FootballNavPhase.kick ||
+          phase == FootballNavPhase.receive,
     );
   }
 }

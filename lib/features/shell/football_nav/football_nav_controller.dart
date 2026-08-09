@@ -61,7 +61,8 @@ class FootballNavController extends Notifier<FootballNavTransition?> {
     );
 
     if (!reverse) {
-      await Future<void>.delayed(const Duration(milliseconds: 90));
+      // Oyoq to‘pga tegib ko‘rinsin — biroz ushlab, keyin past uchish
+      await Future<void>.delayed(const Duration(milliseconds: 160));
       if (state?.id != id) return;
       state = state?.copyWith(phase: FootballNavPhase.fly);
     }
@@ -100,31 +101,33 @@ final footballNavProvider =
   required bool reverse,
 }) {
   double tabX(int i) => 0.125 + i * 0.25;
+  // Oyoq yonidan (pastdan) → nav tugmasi — yuqori uchish yo‘q.
   final start = reverse
       ? (x: tabX(from), y: 0.90)
-      : (x: 0.78, y: 0.38);
+      : (x: 0.72, y: 0.62);
   final end = reverse
-      ? (x: 0.78, y: 0.38)
+      ? (x: 0.72, y: 0.62)
       : (x: tabX(to), y: 0.90);
 
-  final peakY = switch (reverse ? from : to) {
-    1 => 0.16,
-    2 => 0.24,
-    3 => 0.42,
-    _ => 0.22,
-  };
+  // Past, yassi yo‘l — to‘p tepaga sakramaydi, nav bo‘ylab sirpanadi.
+  final peakY = reverse
+      ? ((start.y + end.y) / 2 - 0.04)
+      : ((start.y + end.y) / 2 - 0.05);
   final peakX = (start.x + end.x) / 2 +
       ((reverse ? from : to) == 2
-          ? 0.08
+          ? 0.04
           : (reverse ? from : to) == 1
-              ? -0.06
+              ? -0.03
               : 0.0);
 
   final u = _easeOutCubic(t.clamp(0.0, 1.0));
   final x =
       (1 - u) * (1 - u) * start.x + 2 * (1 - u) * u * peakX + u * u * end.x;
+  // Start pastroq (oyoq yonidan), arc juda past.
+  final y0 = reverse ? start.y : 0.62;
+  final y1 = end.y;
   final y =
-      (1 - u) * (1 - u) * start.y + 2 * (1 - u) * u * peakY + u * u * end.y;
+      (1 - u) * (1 - u) * y0 + 2 * (1 - u) * u * peakY.clamp(0.55, 0.88) + u * u * y1;
   return (x: x, y: y);
 }
 
