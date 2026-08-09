@@ -3,9 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
-import '../../../core/theme/app_theme.dart';
-
-/// Photoreal ball with optional glow + GPU rotation.
+/// Photoreal ball — transparent cutout, no green tint.
 class FootballBall extends StatelessWidget {
   const FootballBall({
     super.key,
@@ -36,31 +34,32 @@ class FootballBall extends StatelessWidget {
         height: size,
         child: Stack(
           alignment: Alignment.center,
+          clipBehavior: Clip.none,
           children: [
+            // Neutral depth shadow only (no mint/green)
             if (glow || selected)
               Container(
-                width: size * 1.35,
-                height: size * 1.35,
+                width: size * 1.15,
+                height: size * 1.15,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.45),
-                      blurRadius: 14,
-                      spreadRadius: 1,
+                      color: Colors.black.withValues(alpha: 0.35),
+                      blurRadius: 10,
+                      spreadRadius: 0,
                     ),
                   ],
                 ),
               ),
-            // Soft contact shadow under ball
             Positioned(
-              bottom: 0,
+              bottom: 1,
               child: Container(
-                width: size * 0.7,
-                height: size * 0.18,
+                width: size * 0.65,
+                height: size * 0.16,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(99),
-                  color: Colors.black.withValues(alpha: 0.35),
+                  color: Colors.black.withValues(alpha: 0.28),
                 ),
               ),
             ),
@@ -69,6 +68,7 @@ class FootballBall extends StatelessWidget {
               width: size,
               height: size,
               fit: BoxFit.contain,
+              filterQuality: FilterQuality.high,
               errorBuilder: (_, __, ___) => Image.asset(
                 'assets/football/ball-real.png',
                 width: size,
@@ -83,7 +83,6 @@ class FootballBall extends StatelessWidget {
 
     if (!trail) return ball;
 
-    // Motion smear — 3 ghost frames behind
     return SizedBox(
       width: size * 2.2,
       height: size * 1.4,

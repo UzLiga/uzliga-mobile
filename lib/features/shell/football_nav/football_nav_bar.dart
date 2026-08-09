@@ -130,7 +130,7 @@ class _TabHitState extends State<_TabHit> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Active = to‘p fon (yashil pill emas); inactive = yengil to‘p
+                  // To‘p fon — oq kvadrat / yashil glow yo‘q
                   SizedBox(
                     width: on ? 46 : 36,
                     height: on ? 46 : 36,
@@ -139,35 +139,32 @@ class _TabHitState extends State<_TabHit> {
                       clipBehavior: Clip.none,
                       children: [
                         Opacity(
-                          opacity: on ? 1 : 0.5,
+                          opacity: on ? 1 : 0.55,
                           child: FootballBall(
-                            size: on ? 44 : 34,
-                            glow: on,
-                            selected: on,
+                            size: on ? 42 : 32,
+                            glow: false,
+                            selected: false,
                           ),
                         ),
-                        // Icon o‘qilishi uchun to‘p ustida yengil soyali
                         if (on)
                           Container(
-                            width: 28,
-                            height: 28,
+                            width: 26,
+                            height: 26,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: Colors.black.withValues(alpha: 0.28),
+                              color: Colors.black.withValues(alpha: 0.32),
                             ),
                           ),
                         Icon(
                           widget.icon,
-                          size: on ? 20 : 22,
-                          color: Colors.white.withValues(alpha: on ? 1 : 0.9),
-                          shadows: on
-                              ? const [
-                                  Shadow(
-                                    color: Color(0x99000000),
-                                    blurRadius: 6,
-                                  ),
-                                ]
-                              : null,
+                          size: on ? 19 : 21,
+                          color: Colors.white.withValues(alpha: on ? 1 : 0.88),
+                          shadows: const [
+                            Shadow(
+                              color: Color(0xAA000000),
+                              blurRadius: 5,
+                            ),
+                          ],
                         ),
                       ],
                     ),
